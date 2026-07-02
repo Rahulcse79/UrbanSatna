@@ -1,0 +1,21 @@
+# Rust
+backend/target/
+**/*.rs.bk
+
+# Environment — never commit secrets
+.env
+*.env.local
+
+# Flutter / Dart
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins*
+mobile/.packages
+mobile/ios/Pods/
+mobile/android/.gradle/
+mobile/*.iml
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

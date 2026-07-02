@@ -1,0 +1,33 @@
+[package]
+name = "urbansatna-api"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "request-id", "timeout", "cors"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "migrate"] }
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+
+uuid = { version = "1", features = ["v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+thiserror = "2"
+anyhow = "1"
+
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+axum-prometheus = "0.8"
+dotenvy = "0.15"
+
+[profile.release]
+lto = "thin"
+strip = true
