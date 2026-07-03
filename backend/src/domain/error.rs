@@ -19,6 +19,12 @@ pub enum AppError {
     NotFound(&'static str),
     #[error("{0}")]
     Conflict(String),
+    #[error("too many attempts, try again later")]
+    RateLimited,
+    #[error("invalid OTP")]
+    OtpInvalid,
+    #[error("OTP expired or not requested")]
+    OtpExpired,
     #[error("dependency unavailable: {0}")]
     Unavailable(String),
     #[error(transparent)]
@@ -35,6 +41,9 @@ impl AppError {
             Self::Forbidden => "FORBIDDEN",
             Self::NotFound(_) => "NOT_FOUND",
             Self::Conflict(_) => "CONFLICT",
+            Self::RateLimited => "RATE_LIMITED",
+            Self::OtpInvalid => "OTP_INVALID",
+            Self::OtpExpired => "OTP_EXPIRED",
             Self::Unavailable(_) => "SERVICE_UNAVAILABLE",
             Self::Internal(_) => "INTERNAL_ERROR",
         }
@@ -47,6 +56,8 @@ impl AppError {
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::NotFound(_) => StatusCode::NOT_FOUND,
             Self::Conflict(_) => StatusCode::CONFLICT,
+            Self::RateLimited => StatusCode::TOO_MANY_REQUESTS,
+            Self::OtpInvalid | Self::OtpExpired => StatusCode::UNAUTHORIZED,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }

@@ -2,6 +2,7 @@ mod api;
 mod config;
 mod domain;
 mod infra;
+mod middleware;
 mod state;
 
 use anyhow::Context;

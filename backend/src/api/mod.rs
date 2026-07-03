@@ -1,8 +1,12 @@
+pub mod auth;
+pub mod bookings;
+pub mod catalog;
 pub mod envelope;
 pub mod health;
+pub mod me;
 
 use axum::http::{HeaderName, Request};
-use axum::routing::get;
+use axum::routing::{get, patch, post};
 use axum::Router;
 use axum_prometheus::PrometheusMetricLayer;
 use tower::ServiceBuilder;
@@ -18,7 +22,33 @@ pub fn router(state: AppState) -> Router {
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
     let request_id_header = HeaderName::from_static(REQUEST_ID_HEADER);
 
-    let api_v1 = Router::new(); // feature routers get merged here as phases land
+    let api_v1 = Router::new()
+        // auth
+        .route("/auth/otp/request", post(auth::request_otp))
+        .route("/auth/otp/verify", post(auth::verify_otp))
+        .route("/auth/refresh", post(auth::refresh))
+        .route("/auth/logout", post(auth::logout))
+        // profile
+        .route("/me", get(me::get_me).patch(me::update_me))
+        .route("/me/become-worker", post(me::become_worker))
+        // catalog (public reads, admin writes)
+        .route(
+            "/categories",
+            get(catalog::list_categories).post(catalog::create_category),
+        )
+        .route("/categories/{id}/services", get(catalog::list_services))
+        .route("/services", post(catalog::create_service))
+        // customer bookings
+        .route("/bookings", post(bookings::create))
+        .route("/bookings/mine", get(bookings::mine))
+        .route("/bookings/{id}/cancel", post(bookings::cancel))
+        .route("/bookings/{id}/rate", post(bookings::rate))
+        // worker jobs
+        .route("/jobs/available", get(bookings::available_jobs))
+        .route("/jobs/mine", get(bookings::my_jobs))
+        .route("/jobs/earnings", get(bookings::earnings))
+        .route("/bookings/{id}/accept", post(bookings::accept))
+        .route("/bookings/{id}/status", patch(bookings::advance));
 
     Router::new()
         .route("/health", get(health::health))

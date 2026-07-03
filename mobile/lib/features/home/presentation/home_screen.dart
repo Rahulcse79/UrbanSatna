@@ -3,18 +3,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
-import '../data/health_repository.dart';
-import '../domain/health_status.dart';
+import '../../catalog/data/catalog_repository.dart';
+import '../../catalog/domain/models.dart';
 
-/// Phase 0 home: proves the app can reach the backend end-to-end.
-/// Replaced by the category grid in Phase 2.
+IconData categoryIcon(String? key) => switch (key) {
+      'electrician' => Icons.electrical_services,
+      'plumber' => Icons.plumbing,
+      'ac' => Icons.ac_unit,
+      'appliance' => Icons.kitchen,
+      'cleaning' => Icons.cleaning_services,
+      'carpenter' => Icons.carpenter,
+      _ => Icons.home_repair_service,
+    };
+
+/// Customer home: the "Explore Services" category grid from the mockup.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final health = ref.watch(healthCheckProvider);
+    final categories = ref.watch(categoriesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -27,52 +36,86 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Center(
-        child: health.when(
-          loading: () => const CircularProgressIndicator(),
-          error: (_, __) => _Unreachable(
-            onRetry: () => ref.invalidate(healthCheckProvider),
-            onSetServerUrl: () => context.push('/settings'),
+      body: categories.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => _Unreachable(
+          onRetry: () => ref.invalidate(categoriesProvider),
+          onSetServerUrl: () => context.push('/settings'),
+        ),
+        data: (items) => RefreshIndicator(
+          onRefresh: () async => ref.invalidate(categoriesProvider),
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    l10n.exploreServices,
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverGrid.count(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.4,
+                  children: [
+                    for (final category in items)
+                      _CategoryCard(category: category),
+                  ],
+                ),
+              ),
+            ],
           ),
-          data: (status) => _HealthReport(status: status),
         ),
       ),
     );
   }
 }
 
-class _HealthReport extends StatelessWidget {
-  const _HealthReport({required this.status});
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({required this.category});
 
-  final HealthStatus status;
+  final Category category;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          status.healthy ? Icons.check_circle : Icons.error,
-          size: 56,
-          color: status.healthy
-              ? Colors.green
-              : Theme.of(context).colorScheme.error,
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 0,
+      color: scheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push(
+          '/category/${category.id}?name=${Uri.encodeComponent(category.name)}',
         ),
-        const SizedBox(height: 16),
-        Text(
-          l10n.statusOverall(status.status),
-          style: Theme.of(context).textTheme.titleLarge,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(categoryIcon(category.icon),
+                  size: 40, color: scheme.primary),
+              const SizedBox(height: 8),
+              Text(
+                category.name,
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        Text(l10n.statusDatabase(status.database)),
-        Text(l10n.statusRedis(status.redis)),
-        const SizedBox(height: 8),
-        Text(
-          'v${status.version}',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
+      ),
     );
   }
 }
@@ -86,24 +129,23 @@ class _Unreachable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.cloud_off,
-          size: 56,
-          color: Theme.of(context).colorScheme.error,
-        ),
-        const SizedBox(height: 16),
-        Text(l10n.backendUnreachable),
-        const SizedBox(height: 16),
-        FilledButton(onPressed: onRetry, child: Text(l10n.retry)),
-        const SizedBox(height: 8),
-        TextButton(
-          onPressed: onSetServerUrl,
-          child: Text(l10n.setServerUrl),
-        ),
-      ],
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_off,
+              size: 56, color: Theme.of(context).colorScheme.error),
+          const SizedBox(height: 16),
+          Text(l10n.backendUnreachable),
+          const SizedBox(height: 16),
+          FilledButton(onPressed: onRetry, child: Text(l10n.retry)),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: onSetServerUrl,
+            child: Text(l10n.setServerUrl),
+          ),
+        ],
+      ),
     );
   }
 }
