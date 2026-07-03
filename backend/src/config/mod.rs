@@ -54,3 +54,34 @@ fn env_or(key: &str, default: &str) -> String {
 fn required(key: &str) -> anyhow::Result<String> {
     std::env::var(key).with_context(|| format!("{key} must be set"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Single test: std::env is process-global, so parallel tests that
+    // mutate it would race.
+    #[test]
+    fn from_env_applies_defaults_and_requires_urls() {
+        std::env::remove_var("DATABASE_URL");
+        std::env::remove_var("REDIS_URL");
+        std::env::remove_var("LOG_FORMAT");
+        assert!(
+            Config::from_env().is_err(),
+            "DATABASE_URL/REDIS_URL must be required"
+        );
+
+        std::env::set_var("DATABASE_URL", "postgres://localhost/test");
+        std::env::set_var("REDIS_URL", "redis://localhost");
+        let config = Config::from_env().unwrap();
+        assert_eq!(config.host, "0.0.0.0");
+        assert_eq!(config.port, 8080);
+        assert!(config.run_migrations);
+        assert_eq!(config.log_format, LogFormat::Json);
+        assert_eq!(config.db_max_connections, 10);
+
+        std::env::set_var("LOG_FORMAT", "sideways");
+        assert!(Config::from_env().is_err(), "bad LOG_FORMAT must fail");
+        std::env::remove_var("LOG_FORMAT");
+    }
+}

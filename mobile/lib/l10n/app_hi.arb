@@ -1,0 +1,9 @@
+{
+  "@@locale": "hi",
+  "appTitle": "अर्बनसतना",
+  "backendUnreachable": "सर्वर से संपर्क नहीं हो पा रहा है। अपना कनेक्शन जांचें।",
+  "retry": "पुनः प्रयास करें",
+  "statusOverall": "बैकएंड: {status}",
+  "statusDatabase": "डेटाबेस: {status}",
+  "statusRedis": "रेडिस: {status}"
+}

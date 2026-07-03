@@ -82,3 +82,55 @@ impl IntoResponse for AppError {
         (self.status(), axum::Json(body)).into_response()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn errors_map_to_stable_codes_and_statuses() {
+        let cases: Vec<(AppError, &str, StatusCode)> = vec![
+            (
+                AppError::Validation("bad phone".into()),
+                "VALIDATION_ERROR",
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (
+                AppError::Unauthorized,
+                "UNAUTHORIZED",
+                StatusCode::UNAUTHORIZED,
+            ),
+            (AppError::Forbidden, "FORBIDDEN", StatusCode::FORBIDDEN),
+            (
+                AppError::NotFound("booking"),
+                "NOT_FOUND",
+                StatusCode::NOT_FOUND,
+            ),
+            (
+                AppError::Conflict("already accepted".into()),
+                "CONFLICT",
+                StatusCode::CONFLICT,
+            ),
+            (
+                AppError::Unavailable("redis".into()),
+                "SERVICE_UNAVAILABLE",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
+            (
+                AppError::Internal(anyhow::anyhow!("boom")),
+                "INTERNAL_ERROR",
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+        ];
+        for (err, code, status) in cases {
+            assert_eq!(err.code(), code);
+            assert_eq!(err.status(), status);
+        }
+    }
+
+    #[test]
+    fn sqlx_row_not_found_maps_to_not_found() {
+        let err: AppError = sqlx::Error::RowNotFound.into();
+        assert_eq!(err.code(), "NOT_FOUND");
+    }
+}

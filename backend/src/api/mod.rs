@@ -22,7 +22,10 @@ pub fn router(state: AppState) -> Router {
 
     Router::new()
         .route("/health", get(health::health))
-        .route("/metrics", get(move || async move { metric_handle.render() }))
+        .route(
+            "/metrics",
+            get(move || async move { metric_handle.render() }),
+        )
         .nest("/api/v1", api_v1)
         .fallback(|| async { AppError::NotFound("route") })
         .with_state(state)

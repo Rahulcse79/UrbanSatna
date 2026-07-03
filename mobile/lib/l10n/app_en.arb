@@ -1,0 +1,24 @@
+{
+  "@@locale": "en",
+  "appTitle": "UrbanSatna",
+  "backendUnreachable": "Cannot reach the server. Check your connection.",
+  "retry": "Retry",
+  "statusOverall": "Backend: {status}",
+  "@statusOverall": {
+    "placeholders": {
+      "status": { "type": "String" }
+    }
+  },
+  "statusDatabase": "Database: {status}",
+  "@statusDatabase": {
+    "placeholders": {
+      "status": { "type": "String" }
+    }
+  },
+  "statusRedis": "Redis: {status}",
+  "@statusRedis": {
+    "placeholders": {
+      "status": { "type": "String" }
+    }
+  }
+}

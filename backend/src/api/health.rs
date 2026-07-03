@@ -27,13 +27,10 @@ pub struct Checks {
 /// Liveness + readiness: verifies PostgreSQL and Redis are reachable.
 /// Returns 200 when everything is up, 503 otherwise (with per-check detail).
 pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
-    let db_ok = tokio::time::timeout(
-        CHECK_TIMEOUT,
-        sqlx::query("SELECT 1").execute(&state.pg),
-    )
-    .await
-    .map(|r| r.is_ok())
-    .unwrap_or(false);
+    let db_ok = tokio::time::timeout(CHECK_TIMEOUT, sqlx::query("SELECT 1").execute(&state.pg))
+        .await
+        .map(|r| r.is_ok())
+        .unwrap_or(false);
 
     let mut redis_conn = state.redis.clone();
     let redis_ok = tokio::time::timeout(

@@ -39,3 +39,27 @@ impl<T: Serialize> ApiResponse<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ok_envelope_shape() {
+        let json = serde_json::to_value(ApiResponse::ok(serde_json::json!({"id": 1}))).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["data"]["id"], 1);
+        assert!(json["error"].is_null());
+        assert!(json.get("meta").is_none(), "meta omitted when None");
+    }
+
+    #[test]
+    fn error_envelope_shape() {
+        let json =
+            serde_json::to_value(ApiResponse::<()>::error("NOT_FOUND", "route not found")).unwrap();
+        assert_eq!(json["success"], false);
+        assert!(json["data"].is_null());
+        assert_eq!(json["error"]["code"], "NOT_FOUND");
+        assert_eq!(json["error"]["message"], "route not found");
+    }
+}

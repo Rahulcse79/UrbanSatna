@@ -1,0 +1,222 @@
+openapi: 3.1.0
+info:
+  title: UrbanSatna API
+  version: 0.1.0
+  description: |
+    Service marketplace platform API. This file is the source of truth for
+    the REST contract (CLAUDE.md §7). Every response uses the uniform
+    envelope `{ success, data, error, meta }`; clients switch on stable
+    `error.code` values, never on messages.
+
+    Implemented: /health, /metrics. The /api/v1/auth/* endpoints are the
+    agreed Phase 1 contract and are not yet implemented.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+paths:
+  /health:
+    get:
+      summary: Liveness and readiness probe
+      operationId: health
+      tags: [system]
+      responses:
+        "200":
+          description: All dependencies reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: One or more dependencies down (same body, status=degraded)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: metrics
+      tags: [system]
+      responses:
+        "200":
+          description: Prometheus text exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/v1/auth/otp/request:
+    post:
+      summary: Request a login OTP (Phase 1 — contract only)
+      operationId: requestOtp
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+                  description: E.164, e.g. +919876543210
+                  example: "+919876543210"
+      responses:
+        "200":
+          description: OTP sent (rate-limited; hashed server-side, TTL 5 min)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+        "429":
+          description: RATE_LIMITED
+
+  /api/v1/auth/otp/verify:
+    post:
+      summary: Verify OTP and issue tokens (Phase 1 — contract only)
+      operationId: verifyOtp
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, otp]
+              properties:
+                phone: { type: string }
+                otp: { type: string }
+                device_id: { type: string }
+                device_name: { type: string }
+      responses:
+        "200":
+          description: Access + refresh tokens
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/TokenPair"
+        "401":
+          description: OTP_INVALID | OTP_EXPIRED
+
+  /api/v1/auth/refresh:
+    post:
+      summary: Rotate refresh token (Phase 1 — contract only)
+      operationId: refreshToken
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "200":
+          description: New token pair; old refresh token revoked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/TokenPair"
+
+  /api/v1/auth/logout:
+    post:
+      summary: Revoke current session or all sessions (Phase 1 — contract only)
+      operationId: logout
+      tags: [auth]
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                all_devices:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: Session(s) revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Envelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+        error:
+          nullable: true
+          $ref: "#/components/schemas/ApiError"
+        meta:
+          type: object
+          nullable: true
+          description: Pagination etc. (`page`, `per_page`, `total`)
+
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable SCREAMING_SNAKE code — clients switch on this
+          example: NOT_FOUND
+        message:
+          type: string
+
+    TokenPair:
+      type: object
+      required: [access_token, refresh_token, expires_in]
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        expires_in:
+          type: integer
+          description: Access token lifetime in seconds
+
+    HealthResponse:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [ok, degraded]
+                checks:
+                  type: object
+                  properties:
+                    database: { type: string, enum: [up, down] }
+                    redis: { type: string, enum: [up, down] }
+                version: { type: string }

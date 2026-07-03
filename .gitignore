@@ -8,6 +8,7 @@ backend/target/
 
 # Flutter / Dart
 mobile/.dart_tool/
+mobile/lib/l10n/gen/
 mobile/build/
 mobile/.flutter-plugins*
 mobile/.packages
