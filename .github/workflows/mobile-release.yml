@@ -41,12 +41,13 @@ jobs:
           cache: true
 
       # Platform folders are not committed yet; generate them when missing.
-      # --org in => applicationId in.urbansatna. Once real android/ files
-      # are committed this step is a no-op.
+      # --org com + project urbansatna => applicationId com.urbansatna.
+      # ("in" is a Kotlin keyword and breaks build.gradle.kts namespaces.)
+      # Once real android/ files are committed this step is a no-op.
       - name: Ensure Android platform files
         run: |
           if [ ! -d android ]; then
-            flutter create --platforms=android --org in --project-name urbansatna .
+            flutter create --platforms=android --org com --project-name urbansatna .
           fi
 
       - name: Dependencies
@@ -98,7 +99,7 @@ jobs:
       - name: Ensure iOS platform files
         run: |
           if [ ! -d ios ]; then
-            flutter create --platforms=ios --org in --project-name urbansatna .
+            flutter create --platforms=ios --org com --project-name urbansatna .
           fi
 
       - name: Dependencies
