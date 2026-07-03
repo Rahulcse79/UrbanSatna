@@ -19,19 +19,23 @@ Read first: [CLAUDE.md](CLAUDE.md) (architecture rules) ·
 ## Quickstart
 
 ```bash
-# 1. Infrastructure (Postgres on host port 55432, Redis 6379, MinIO 9000/9001)
-docker compose -f infra/docker-compose.yml up -d --wait
-
-# 2. Backend — migrations run automatically on startup (RUN_MIGRATIONS=true)
-cd backend
-cp .env.example .env
-cargo run
+# Backend + dependencies in one step (creates backend/.env on first run,
+# reuses running Postgres/Redis, falls back to docker compose / local redis):
+./start.sh              # dev build
+./start.sh --release    # optimized build
 # → http://localhost:8080/health, /metrics
 
-# 3. Mobile
-cd ../mobile
+# Mobile
+cd mobile
 flutter pub get && flutter gen-l10n
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080   # Android emulator
+```
+
+Manual alternative to `start.sh`:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --wait   # PG 55432, Redis, MinIO
+cd backend && cp .env.example .env && cargo run           # migrations run on startup
 ```
 
 ### No Docker? (native fallback)

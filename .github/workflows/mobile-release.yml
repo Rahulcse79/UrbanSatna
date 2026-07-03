@@ -1,0 +1,125 @@
+name: Mobile Release Builds
+
+# Builds installable artifacts for the Flutter app:
+#   - Android: release APK (debug-signed until a Play keystore is configured)
+#   - iOS: unsigned .ipa (no Apple signing certificates in CI yet)
+#
+# Trigger manually (workflow_dispatch) or by pushing a v* tag.
+# Set the repository variable API_BASE_URL to point builds at a real server.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+env:
+  FLUTTER_CHANNEL: stable
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      # Platform folders are not committed yet; generate them when missing.
+      # --org in => applicationId in.urbansatna. Once real android/ files
+      # are committed this step is a no-op.
+      - name: Ensure Android platform files
+        run: |
+          if [ ! -d android ]; then
+            flutter create --platforms=android --org in --project-name urbansatna .
+          fi
+
+      - name: Dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Build APK
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: >
+          flutter build apk --release
+          --dart-define=API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8080}"
+
+      - name: Build AppBundle (Play Store)
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: >
+          flutter build appbundle --release
+          --dart-define=API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8080}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: urbansatna-android-apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: urbansatna-android-aab
+          path: mobile/build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+  ios:
+    name: iOS (unsigned)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Ensure iOS platform files
+        run: |
+          if [ ! -d ios ]; then
+            flutter create --platforms=ios --org in --project-name urbansatna .
+          fi
+
+      - name: Dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Build iOS (no codesign)
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: >
+          flutter build ios --release --no-codesign
+          --dart-define=API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8080}"
+
+      # Unsigned ipa: installable via AltStore/Sideloadly or re-signable
+      # later; proper TestFlight distribution needs Apple signing secrets.
+      - name: Package unsigned ipa
+        run: |
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -qr urbansatna-ios-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: urbansatna-ios-unsigned-ipa
+          path: mobile/build/ios/iphoneos/urbansatna-ios-unsigned.ipa
+          if-no-files-found: error
