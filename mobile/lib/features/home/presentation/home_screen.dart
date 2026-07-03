@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../data/health_repository.dart';
@@ -16,12 +17,22 @@ class HomeScreen extends ConsumerWidget {
     final health = ref.watch(healthCheckProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.appTitle)),
+      appBar: AppBar(
+        title: Text(l10n.appTitle),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: l10n.settingsTitle,
+            onPressed: () => context.push('/settings'),
+          ),
+        ],
+      ),
       body: Center(
         child: health.when(
           loading: () => const CircularProgressIndicator(),
           error: (_, __) => _Unreachable(
             onRetry: () => ref.invalidate(healthCheckProvider),
+            onSetServerUrl: () => context.push('/settings'),
           ),
           data: (status) => _HealthReport(status: status),
         ),
@@ -67,9 +78,10 @@ class _HealthReport extends StatelessWidget {
 }
 
 class _Unreachable extends StatelessWidget {
-  const _Unreachable({required this.onRetry});
+  const _Unreachable({required this.onRetry, required this.onSetServerUrl});
 
   final VoidCallback onRetry;
+  final VoidCallback onSetServerUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +98,11 @@ class _Unreachable extends StatelessWidget {
         Text(l10n.backendUnreachable),
         const SizedBox(height: 16),
         FilledButton(onPressed: onRetry, child: Text(l10n.retry)),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: onSetServerUrl,
+          child: Text(l10n.setServerUrl),
+        ),
       ],
     );
   }

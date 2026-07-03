@@ -1,12 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../config/env.dart';
+import '../config/server_url.dart';
 
 final dioProvider = Provider<Dio>((ref) {
+  // Rebuilds (and re-runs anything that depends on it) when the user
+  // changes the server URL in Settings.
   return Dio(
     BaseOptions(
-      baseUrl: Env.apiBaseUrl,
+      baseUrl: ref.watch(serverUrlProvider),
       connectTimeout: const Duration(seconds: 5),
       receiveTimeout: const Duration(seconds: 10),
       headers: {'accept': 'application/json'},
