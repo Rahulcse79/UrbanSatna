@@ -13,13 +13,13 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-      child: const UrbanSatnaApp(),
+      child: const ServexaApp(),
     ),
   );
 }
 
-class UrbanSatnaApp extends ConsumerWidget {
-  const UrbanSatnaApp({super.key});
+class ServexaApp extends ConsumerWidget {
+  const ServexaApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

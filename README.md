@@ -5,6 +5,9 @@ professionals (electrician, plumber, AC technician, cleaning, …). Launch
 city: **Satna, Madhya Pradesh**. Service categories are data managed by
 admins at runtime, never code.
 
+The mobile app ships under the brand name **Servexa** (app ID
+`com.servexa`, Dart package `servexa`).
+
 | Part       | Stack                                        | Path       |
 |------------|----------------------------------------------|------------|
 | API        | Rust · Axum · SQLx · PostgreSQL 16 · Redis   | `backend/` |

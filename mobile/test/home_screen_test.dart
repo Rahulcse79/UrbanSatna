@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:urbansatna/features/home/data/health_repository.dart';
-import 'package:urbansatna/features/home/domain/health_status.dart';
-import 'package:urbansatna/features/home/presentation/home_screen.dart';
-import 'package:urbansatna/l10n/gen/app_localizations.dart';
+import 'package:servexa/features/home/data/health_repository.dart';
+import 'package:servexa/features/home/domain/health_status.dart';
+import 'package:servexa/features/home/presentation/home_screen.dart';
+import 'package:servexa/l10n/gen/app_localizations.dart';
 
 Widget _app({required List<Override> overrides}) {
   return ProviderScope(

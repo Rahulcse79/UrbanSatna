@@ -41,13 +41,13 @@ jobs:
           cache: true
 
       # Platform folders are not committed yet; generate them when missing.
-      # --org com + project urbansatna => applicationId com.urbansatna.
+      # --org com + project servexa => applicationId com.servexa.
       # ("in" is a Kotlin keyword and breaks build.gradle.kts namespaces.)
       # Once real android/ files are committed this step is a no-op.
       - name: Ensure Android platform files
         run: |
           if [ ! -d android ]; then
-            flutter create --platforms=android --org com --project-name urbansatna .
+            flutter create --platforms=android --org com --project-name servexa .
           fi
           # Release builds need INTERNET explicitly, and Android 9+ blocks
           # plain http:// unless cleartext is allowed — required while the
@@ -59,7 +59,9 @@ jobs:
           if ! grep -q 'usesCleartextTraffic' "$MANIFEST"; then
             sed -i 's#<application#<application android:usesCleartextTraffic="true"#' "$MANIFEST"
           fi
-          grep -E 'INTERNET|usesCleartextTraffic' "$MANIFEST"
+          # Launcher shows the brand name, not the package name.
+          sed -i 's#android:label="servexa"#android:label="Servexa"#' "$MANIFEST"
+          grep -E 'INTERNET|usesCleartextTraffic|android:label' "$MANIFEST"
 
       - name: Dependencies
         run: flutter pub get
@@ -83,13 +85,13 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: urbansatna-android-apk
+          name: servexa-android-apk
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
         with:
-          name: urbansatna-android-aab
+          name: servexa-android-aab
           path: mobile/build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
@@ -110,8 +112,12 @@ jobs:
       - name: Ensure iOS platform files
         run: |
           if [ ! -d ios ]; then
-            flutter create --platforms=ios --org com --project-name urbansatna .
+            flutter create --platforms=ios --org com --project-name servexa .
           fi
+          # Home screen shows the brand name, not the package name.
+          PLIST=ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Servexa' "$PLIST" \
+            || /usr/libexec/PlistBuddy -c 'Add :CFBundleDisplayName string Servexa' "$PLIST"
 
       - name: Dependencies
         run: flutter pub get
@@ -133,10 +139,10 @@ jobs:
           cd build/ios/iphoneos
           mkdir -p Payload
           cp -r Runner.app Payload/
-          zip -qr urbansatna-ios-unsigned.ipa Payload
+          zip -qr servexa-ios-unsigned.ipa Payload
 
       - uses: actions/upload-artifact@v4
         with:
-          name: urbansatna-ios-unsigned-ipa
-          path: mobile/build/ios/iphoneos/urbansatna-ios-unsigned.ipa
+          name: servexa-ios-unsigned-ipa
+          path: mobile/build/ios/iphoneos/servexa-ios-unsigned.ipa
           if-no-files-found: error

@@ -1,6 +1,6 @@
 {
   "@@locale": "hi",
-  "appTitle": "अर्बनसतना",
+  "appTitle": "Servexa",
   "backendUnreachable": "सर्वर से संपर्क नहीं हो पा रहा है। अपना कनेक्शन जांचें।",
   "retry": "पुनः प्रयास करें",
   "statusOverall": "बैकएंड: {status}",
@@ -8,7 +8,7 @@
   "statusRedis": "रेडिस: {status}",
   "settingsTitle": "सेटिंग्स",
   "serverUrlLabel": "सर्वर URL",
-  "serverUrlHelp": "UrbanSatna बैकएंड का पता, जैसे http://192.168.1.10:8080",
+  "serverUrlHelp": "Servexa बैकएंड का पता, जैसे http://192.168.1.10:8080",
   "serverUrlInvalid": "http:// या https:// से शुरू होने वाला मान्य URL दर्ज करें",
   "serverUrlSaved": "सर्वर URL सहेजा गया",
   "save": "सहेजें",

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:urbansatna/core/config/server_url.dart';
-import 'package:urbansatna/features/settings/presentation/settings_screen.dart';
-import 'package:urbansatna/l10n/gen/app_localizations.dart';
+import 'package:servexa/core/config/server_url.dart';
+import 'package:servexa/features/settings/presentation/settings_screen.dart';
+import 'package:servexa/l10n/gen/app_localizations.dart';
 
 Future<SharedPreferences> _emptyPrefs() async {
   SharedPreferences.setMockInitialValues({});
