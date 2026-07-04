@@ -1,0 +1,245 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/network/api_client.dart';
+import '../../../l10n/gen/app_localizations.dart';
+import '../../bookings/data/bookings_repository.dart';
+import '../../bookings/domain/booking.dart';
+import '../../bookings/presentation/bookings_screen.dart'
+    show statusColor, statusLabel;
+
+/// Worker view: earnings, available jobs to accept, and assigned jobs
+/// to advance (mockup "Available Jobs" screen).
+class JobsScreen extends ConsumerWidget {
+  const JobsScreen({super.key});
+
+  void _refresh(WidgetRef ref) {
+    ref.invalidate(availableJobsProvider);
+    ref.invalidate(myJobsProvider);
+    ref.invalidate(earningsProvider);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final available = ref.watch(availableJobsProvider);
+    final mine = ref.watch(myJobsProvider);
+    final earnings = ref.watch(earningsProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.navJobs)),
+      body: RefreshIndicator(
+        onRefresh: () async => _refresh(ref),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            earnings.when(
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (e) => Card(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _Stat(label: l10n.earningsTitle, value: e.totalLabel),
+                      _Stat(
+                          label: l10n.completedJobs,
+                          value: '${e.completedJobs}'),
+                      _Stat(
+                        label: l10n.avgRating,
+                        value: e.avgRating?.toStringAsFixed(1) ?? '—',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(l10n.myJobs,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            mine.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Text(apiErrorMessage(e)),
+              data: (jobs) => jobs.isEmpty
+                  ? Text(l10n.noJobs)
+                  : Column(
+                      children: [
+                        for (final job in jobs)
+                          _JobCard(
+                            job: job,
+                            onAction: () => _refresh(ref),
+                            assigned: true,
+                          ),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 16),
+            Text(l10n.availableJobs,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            available.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Text(apiErrorMessage(e)),
+              data: (jobs) => jobs.isEmpty
+                  ? Text(l10n.noJobs)
+                  : Column(
+                      children: [
+                        for (final job in jobs)
+                          _JobCard(
+                            job: job,
+                            onAction: () => _refresh(ref),
+                            assigned: false,
+                          ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(value,
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold)),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _JobCard extends ConsumerWidget {
+  const _JobCard({
+    required this.job,
+    required this.onAction,
+    required this.assigned,
+  });
+
+  final Booking job;
+  final VoidCallback onAction;
+  final bool assigned;
+
+  String _actionLabel(AppLocalizations l10n, String action) =>
+      switch (action) {
+        'en_route' => l10n.actionEnRoute,
+        'start' => l10n.actionStart,
+        'complete' => l10n.actionComplete,
+        _ => action,
+      };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final repo = ref.read(bookingsRepositoryProvider);
+    final action = job.nextWorkerAction;
+
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${job.serviceName} (${job.categoryName})',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                if (assigned)
+                  Chip(
+                    label: Text(statusLabel(l10n, job.status)),
+                    labelStyle:
+                        const TextStyle(color: Colors.white, fontSize: 12),
+                    backgroundColor: statusColor(context, job.status),
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+            Text(job.address, style: Theme.of(context).textTheme.bodySmall),
+            if (job.note != null && job.note!.isNotEmpty)
+              Text('“${job.note}”',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(fontStyle: FontStyle.italic)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Text(job.priceLabel,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                if (!assigned)
+                  FilledButton(
+                    onPressed: () async {
+                      try {
+                        await repo.accept(job.id);
+                        onAction();
+                      } catch (e) {
+                        messenger.showSnackBar(
+                            SnackBar(content: Text(apiErrorMessage(e))));
+                        onAction();
+                      }
+                    },
+                    child: Text(l10n.accept),
+                  )
+                else if (action != null)
+                  FilledButton(
+                    onPressed: () async {
+                      try {
+                        await repo.advance(job.id, action);
+                        onAction();
+                      } catch (e) {
+                        messenger.showSnackBar(
+                            SnackBar(content: Text(apiErrorMessage(e))));
+                      }
+                    },
+                    child: Text(_actionLabel(l10n, action)),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
