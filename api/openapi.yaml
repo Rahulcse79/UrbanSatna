@@ -1,87 +1,52 @@
 openapi: 3.1.0
 info:
-  title: UrbanSatna API
-  version: 0.1.0
+  title: Servexa API (UrbanSatna platform)
+  version: 0.2.0
   description: |
-    Service marketplace platform API. This file is the source of truth for
-    the REST contract (CLAUDE.md §7). Every response uses the uniform
-    envelope `{ success, data, error, meta }`; clients switch on stable
-    `error.code` values, never on messages.
+    Service marketplace API. Source of truth for the REST contract.
+    Every response uses the envelope `{ success, data, error, meta }`;
+    clients switch on stable `error.code` values (SCREAMING_SNAKE), never
+    on messages. Codes: VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN,
+    NOT_FOUND, CONFLICT, RATE_LIMITED, OTP_INVALID, OTP_EXPIRED,
+    SERVICE_UNAVAILABLE, INTERNAL_ERROR.
 
-    Implemented: /health, /metrics. The /api/v1/auth/* endpoints are the
-    agreed Phase 1 contract and are not yet implemented.
+    Auth: Bearer JWT access token (15 min) + rotating opaque refresh
+    token (30 days). Roles/permissions are embedded in the JWT.
 
 servers:
   - url: http://localhost:8080
-    description: Local development
+
+tags:
+  - name: system
+  - name: auth
+  - name: profile
+  - name: catalog
+  - name: bookings
+  - name: jobs
 
 paths:
   /health:
     get:
-      summary: Liveness and readiness probe
-      operationId: health
       tags: [system]
-      responses:
-        "200":
-          description: All dependencies reachable
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthResponse"
-        "503":
-          description: One or more dependencies down (same body, status=degraded)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthResponse"
-
+      summary: Liveness/readiness (DB + Redis); 200 ok / 503 degraded
+      responses: { "200": { description: healthy }, "503": { description: degraded } }
   /metrics:
     get:
-      summary: Prometheus metrics
-      operationId: metrics
       tags: [system]
-      responses:
-        "200":
-          description: Prometheus text exposition format
-          content:
-            text/plain:
-              schema:
-                type: string
+      summary: Prometheus metrics
+      responses: { "200": { description: metrics text } }
 
   /api/v1/auth/otp/request:
     post:
-      summary: Request a login OTP (Phase 1 — contract only)
-      operationId: requestOtp
       tags: [auth]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [phone]
-              properties:
-                phone:
-                  type: string
-                  description: E.164, e.g. +919876543210
-                  example: "+919876543210"
-      responses:
-        "200":
-          description: OTP sent (rate-limited; hashed server-side, TTL 5 min)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Envelope"
-        "429":
-          description: RATE_LIMITED
-
+      summary: Send login OTP (rate-limited 3/10min; dev may return dev_otp)
+      requestBody: { $ref: "#/components/requestBodies/Phone" }
+      responses: { "200": { description: OTP sent }, "429": { description: RATE_LIMITED } }
   /api/v1/auth/otp/verify:
     post:
-      summary: Verify OTP and issue tokens (Phase 1 — contract only)
-      operationId: verifyOtp
       tags: [auth]
+      summary: Verify OTP; creates user on first login; returns TokenPair
       requestBody:
-        required: true
         content:
           application/json:
             schema:
@@ -92,131 +57,152 @@ paths:
                 otp: { type: string }
                 device_id: { type: string }
                 device_name: { type: string }
-      responses:
-        "200":
-          description: Access + refresh tokens
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data:
-                        $ref: "#/components/schemas/TokenPair"
-        "401":
-          description: OTP_INVALID | OTP_EXPIRED
-
+      responses: { "200": { description: TokenPair }, "401": { description: OTP_INVALID | OTP_EXPIRED } }
   /api/v1/auth/refresh:
     post:
-      summary: Rotate refresh token (Phase 1 — contract only)
-      operationId: refreshToken
       tags: [auth]
+      summary: Rotate refresh token; returns new TokenPair (old token dies)
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               type: object
               required: [refresh_token]
-              properties:
-                refresh_token: { type: string }
-      responses:
-        "200":
-          description: New token pair; old refresh token revoked
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data:
-                        $ref: "#/components/schemas/TokenPair"
-
+              properties: { refresh_token: { type: string } }
+      responses: { "200": { description: TokenPair }, "401": { description: UNAUTHORIZED } }
   /api/v1/auth/logout:
     post:
-      summary: Revoke current session or all sessions (Phase 1 — contract only)
-      operationId: logout
       tags: [auth]
-      security:
-        - bearerAuth: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                all_devices:
-                  type: boolean
-                  default: false
-      responses:
-        "200":
-          description: Session(s) revoked
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Envelope"
+      security: [{ bearerAuth: [] }]
+      summary: Revoke this session (or all with {"all_devices":true})
+      responses: { "200": { description: revoked } }
+
+  /api/v1/me:
+    get:
+      tags: [profile]
+      security: [{ bearerAuth: [] }]
+      summary: Current user profile + roles
+      responses: { "200": { description: profile } }
+    patch:
+      tags: [profile]
+      security: [{ bearerAuth: [] }]
+      summary: Update full_name / email
+      responses: { "200": { description: updated profile } }
+  /api/v1/me/become-worker:
+    post:
+      tags: [profile]
+      security: [{ bearerAuth: [] }]
+      summary: Self-service worker role (test phase; KYC flow replaces this)
+      responses: { "200": { description: role granted; refresh token to activate } }
+
+  /api/v1/categories:
+    get:
+      tags: [catalog]
+      summary: Active categories (public)
+      responses: { "200": { description: "[{id,name,icon,sort_order}]" } }
+    post:
+      tags: [catalog]
+      security: [{ bearerAuth: [] }]
+      summary: Create category (perm catalog:manage)
+      responses: { "200": { description: category }, "403": { description: FORBIDDEN } }
+  /api/v1/categories/{id}/services:
+    get:
+      tags: [catalog]
+      summary: Active services of a category (public)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: "[{id,name,description,base_price_paise,duration_min}]" } }
+  /api/v1/services:
+    post:
+      tags: [catalog]
+      security: [{ bearerAuth: [] }]
+      summary: Create service (perm catalog:manage)
+      responses: { "200": { description: service } }
+
+  /api/v1/bookings:
+    post:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: Create booking {service_id, address, note?}; price snapshotted
+      responses: { "200": { description: Booking }, "422": { description: VALIDATION_ERROR } }
+  /api/v1/bookings/mine:
+    get:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: My bookings; ?scope=active(default)|past
+      responses: { "200": { description: "[Booking]" } }
+  /api/v1/bookings/{id}/cancel:
+    post:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: Customer cancels (pending/accepted only)
+      responses: { "200": { description: Booking }, "409": { description: CONFLICT } }
+  /api/v1/bookings/{id}/rate:
+    post:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: Rate a completed booking once {rating 1-5, review?}
+      responses: { "200": { description: Booking }, "409": { description: CONFLICT } }
+  /api/v1/bookings/{id}/accept:
+    post:
+      tags: [jobs]
+      security: [{ bearerAuth: [] }]
+      summary: Worker accepts a pending job (first accept wins)
+      responses: { "200": { description: Booking }, "409": { description: already taken } }
+  /api/v1/bookings/{id}/status:
+    patch:
+      tags: [jobs]
+      security: [{ bearerAuth: [] }]
+      summary: "Assigned worker advances: {action: en_route|start|complete}"
+      responses: { "200": { description: Booking }, "409": { description: invalid transition } }
+
+  /api/v1/jobs/available:
+    get:
+      tags: [jobs]
+      security: [{ bearerAuth: [] }]
+      summary: Unassigned pending jobs (role worker)
+      responses: { "200": { description: "[Booking]" } }
+  /api/v1/jobs/mine:
+    get:
+      tags: [jobs]
+      security: [{ bearerAuth: [] }]
+      summary: Worker's active jobs
+      responses: { "200": { description: "[Booking]" } }
+  /api/v1/jobs/earnings:
+    get:
+      tags: [jobs]
+      security: [{ bearerAuth: [] }]
+      summary: "{completed_jobs, total_paise, avg_rating}"
+      responses: { "200": { description: earnings } }
 
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  requestBodies:
+    Phone:
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [phone]
+            properties:
+              phone: { type: string, description: "E.164, e.g. +919876543210" }
   schemas:
-    Envelope:
+    Booking:
       type: object
-      required: [success, data, error]
+      description: Central booking object returned by all booking/job endpoints
       properties:
-        success:
-          type: boolean
-        data:
-          nullable: true
-        error:
-          nullable: true
-          $ref: "#/components/schemas/ApiError"
-        meta:
-          type: object
-          nullable: true
-          description: Pagination etc. (`page`, `per_page`, `total`)
-
-    ApiError:
-      type: object
-      required: [code, message]
-      properties:
-        code:
-          type: string
-          description: Stable SCREAMING_SNAKE code — clients switch on this
-          example: NOT_FOUND
-        message:
-          type: string
-
-    TokenPair:
-      type: object
-      required: [access_token, refresh_token, expires_in]
-      properties:
-        access_token: { type: string }
-        refresh_token: { type: string }
-        expires_in:
-          type: integer
-          description: Access token lifetime in seconds
-
-    HealthResponse:
-      allOf:
-        - $ref: "#/components/schemas/Envelope"
-        - type: object
-          properties:
-            data:
-              type: object
-              properties:
-                status:
-                  type: string
-                  enum: [ok, degraded]
-                checks:
-                  type: object
-                  properties:
-                    database: { type: string, enum: [up, down] }
-                    redis: { type: string, enum: [up, down] }
-                version: { type: string }
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [pending, accepted, en_route, in_progress, completed, cancelled] }
+        service_id: { type: string, format: uuid }
+        service_name: { type: string }
+        category_name: { type: string }
+        customer_id: { type: string, format: uuid }
+        customer_name: { type: string, nullable: true }
+        worker_id: { type: string, format: uuid, nullable: true }
+        worker_name: { type: string, nullable: true }
+        address: { type: string }
+        note: { type: string, nullable: true }
+        price_paise: { type: integer, format: int64 }
+        rating: { type: integer, nullable: true }
+        review: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
