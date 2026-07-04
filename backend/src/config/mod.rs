@@ -28,9 +28,11 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
         let host = env_or("APP_HOST", "0.0.0.0");
-        let port: u16 = env_or("APP_PORT", "8080")
+        // PORT is the platform convention (Render/Heroku); APP_PORT is ours.
+        let port: u16 = std::env::var("PORT")
+            .unwrap_or_else(|_| env_or("APP_PORT", "8080"))
             .parse()
-            .context("APP_PORT must be a number")?;
+            .context("PORT/APP_PORT must be a number")?;
         let database_url = required("DATABASE_URL")?;
         let redis_url = required("REDIS_URL")?;
         let run_migrations = env_or("RUN_MIGRATIONS", "true") == "true";
@@ -93,6 +95,7 @@ mod tests {
         std::env::remove_var("REDIS_URL");
         std::env::remove_var("LOG_FORMAT");
         std::env::remove_var("JWT_SECRET");
+        std::env::remove_var("PORT");
         assert!(
             Config::from_env().is_err(),
             "DATABASE_URL/REDIS_URL/JWT_SECRET must be required"

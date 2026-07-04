@@ -1,0 +1,48 @@
+# Render Blueprint: API + PostgreSQL + Redis, auto-deployed on every
+# push to main. One-time setup: Render Dashboard → New → Blueprint →
+# pick this repo → Apply. After that, deploys are automatic.
+
+services:
+  - type: web
+    name: servexa-api
+    runtime: docker
+    plan: free
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: servexa-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: servexa-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: LOG_FORMAT
+        value: json
+      - key: RUST_LOG
+        value: urbansatna_api=info,tower_http=info
+      # No SMS provider yet: the OTP comes back in the API response so
+      # logins work. Turn this off the moment a real SMS gateway lands.
+      - key: DEV_RETURN_OTP
+        value: "true"
+      - key: ADMIN_PHONES
+        value: "+919752079591,+919999999999"
+
+  - type: keyvalue
+    name: servexa-redis
+    plan: free
+    ipAllowList: [] # internal access only
+
+databases:
+  - name: servexa-db
+    plan: free
+    databaseName: servexa
+    user: servexa
