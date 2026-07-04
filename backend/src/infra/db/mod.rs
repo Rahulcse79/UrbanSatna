@@ -7,7 +7,6 @@ pub mod users;
 
 use std::time::Duration;
 
-use anyhow::Context;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
