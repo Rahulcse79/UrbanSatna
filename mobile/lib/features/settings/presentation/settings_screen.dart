@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/config/server_url.dart';
 import '../../../l10n/gen/app_localizations.dart';
 
@@ -52,6 +53,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // Admin-controlled: when false the URL is visible but locked.
+    final allowChange = ref
+        .watch(appConfigProvider)
+        .maybeWhen(data: (c) => c.allowServerUrlChange, orElse: () => true);
+
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settingsTitle)),
       body: Padding(
@@ -63,21 +69,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               TextFormField(
                 controller: _controller,
+                enabled: allowChange,
                 keyboardType: TextInputType.url,
                 autocorrect: false,
                 decoration: InputDecoration(
                   labelText: l10n.serverUrlLabel,
-                  helperText: l10n.serverUrlHelp,
+                  helperText: allowChange
+                      ? l10n.serverUrlHelp
+                      : l10n.serverManagedByAdmin,
                   helperMaxLines: 2,
                   border: const OutlineInputBorder(),
+                  suffixIcon:
+                      allowChange ? null : const Icon(Icons.lock_outline),
                 ),
                 validator: _validateUrl,
-                onFieldSubmitted: (_) => _save(),
+                onFieldSubmitted: allowChange ? (_) => _save() : null,
               ),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _save, child: Text(l10n.save)),
-              const SizedBox(height: 8),
-              TextButton(onPressed: _reset, child: Text(l10n.resetToDefault)),
+              if (allowChange) ...[
+                FilledButton(onPressed: _save, child: Text(l10n.save)),
+                const SizedBox(height: 8),
+                TextButton(onPressed: _reset, child: Text(l10n.resetToDefault)),
+              ],
             ],
           ),
         ),

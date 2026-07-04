@@ -60,6 +60,8 @@
   "serverUrlHelp": "Servexa बैकएंड का पता, जैसे http://192.168.1.10:8080",
   "serverUrlInvalid": "http:// या https:// से शुरू होने वाला मान्य URL दर्ज करें",
   "serverUrlSaved": "सर्वर URL सहेजा गया",
+  "serverManagedByAdmin": "सर्वर URL व्यवस्थापक द्वारा प्रबंधित है",
+  "serverLabelShort": "सर्वर",
   "save": "सहेजें",
   "resetToDefault": "डिफ़ॉल्ट पर रीसेट करें",
   "setServerUrl": "सर्वर URL सेट करें"

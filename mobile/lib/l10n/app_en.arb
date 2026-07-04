@@ -60,6 +60,8 @@
   "serverUrlHelp": "Address of the Servexa backend, e.g. http://192.168.1.10:8080",
   "serverUrlInvalid": "Enter a valid URL starting with http:// or https://",
   "serverUrlSaved": "Server URL saved",
+  "serverManagedByAdmin": "Server URL is managed by the administrator",
+  "serverLabelShort": "Server",
   "save": "Save",
   "resetToDefault": "Reset to default",
   "setServerUrl": "Set server URL"

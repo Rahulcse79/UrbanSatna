@@ -2,6 +2,7 @@ pub mod audit;
 pub mod bookings;
 pub mod catalog;
 pub mod sessions;
+pub mod settings;
 pub mod users;
 
 use std::time::Duration;

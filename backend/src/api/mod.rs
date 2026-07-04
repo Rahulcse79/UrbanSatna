@@ -1,3 +1,4 @@
+pub mod app_config;
 pub mod auth;
 pub mod bookings;
 pub mod catalog;
@@ -23,6 +24,11 @@ pub fn router(state: AppState) -> Router {
     let request_id_header = HeaderName::from_static(REQUEST_ID_HEADER);
 
     let api_v1 = Router::new()
+        // app config (public read; admin write)
+        .route(
+            "/app-config",
+            get(app_config::get).patch(app_config::update),
+        )
         // auth
         .route("/auth/otp/request", post(auth::request_otp))
         .route("/auth/otp/verify", post(auth::verify_otp))

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_controller.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/config/server_url.dart';
 import '../../../core/network/api_client.dart';
 import '../../../l10n/gen/app_localizations.dart';
 
@@ -136,9 +139,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         }),
                 child: Text(l10n.changePhone),
               ),
+            const Spacer(),
+            const _ServerUrlFooter(),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Shows which server the app talks to; editable only when the
+/// admin-controlled flag allows it (default: allowed).
+class _ServerUrlFooter extends ConsumerWidget {
+  const _ServerUrlFooter();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final url = ref.watch(serverUrlProvider);
+    final allowChange = ref
+        .watch(appConfigProvider)
+        .maybeWhen(data: (c) => c.allowServerUrlChange, orElse: () => true);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Flexible(
+          child: Text(
+            '${l10n.serverLabelShort}: $url',
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
+        if (allowChange)
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.edit, size: 16),
+            tooltip: l10n.settingsTitle,
+            onPressed: () => context.push('/settings'),
+          ),
+      ],
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:servexa/core/config/app_config.dart';
 import 'package:servexa/core/config/server_url.dart';
 import 'package:servexa/features/settings/presentation/settings_screen.dart';
 import 'package:servexa/l10n/gen/app_localizations.dart';
@@ -11,9 +12,14 @@ Future<SharedPreferences> _emptyPrefs() async {
   return SharedPreferences.getInstance();
 }
 
-Widget _app(SharedPreferences prefs) {
+Widget _app(SharedPreferences prefs, {bool allowChange = true}) {
   return ProviderScope(
-    overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+    overrides: [
+      sharedPreferencesProvider.overrideWithValue(prefs),
+      appConfigProvider.overrideWith(
+        (ref) async => AppConfig(allowServerUrlChange: allowChange),
+      ),
+    ],
     child: const MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -56,20 +62,19 @@ void main() {
     expect(prefs.getString('server_url'), isNull);
   });
 
-  testWidgets('reset returns to the build-time default', (tester) async {
-    SharedPreferences.setMockInitialValues(
-        {'server_url': 'http://192.168.1.50:8080'});
-    final prefs = await SharedPreferences.getInstance();
-    await tester.pumpWidget(_app(prefs));
+  testWidgets('admin flag off locks the field and hides save',
+      (tester) async {
+    final prefs = await _emptyPrefs();
+    await tester.pumpWidget(_app(prefs, allowChange: false));
     await tester.pumpAndSettle();
 
-    expect(find.text('http://192.168.1.50:8080'), findsOneWidget);
-
-    await tester.tap(find.text('Reset to default'));
-    await tester.pumpAndSettle();
-
-    expect(prefs.getString('server_url'), isNull);
-    // Default from Env (no --dart-define in tests): emulator loopback.
-    expect(find.text('http://10.0.2.2:8080'), findsOneWidget);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.enabled, isFalse);
+    expect(find.text('Save'), findsNothing);
+    expect(find.text('Reset to default'), findsNothing);
+    expect(
+      find.text('Server URL is managed by the administrator'),
+      findsOneWidget,
+    );
   });
 }
