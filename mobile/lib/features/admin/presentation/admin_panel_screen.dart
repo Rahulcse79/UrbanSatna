@@ -92,7 +92,24 @@ class AdminPanelScreen extends ConsumerWidget {
                   title: Text(l10n.minBuildLabel),
                   subtitle: Text('${c.minBuild}'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _editMinBuild(context, ref, c.minBuild),
+                  onTap: () => _editBuildNumber(
+                      context, ref, l10n.minBuildLabel, 'min_build', c.minBuild),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.new_releases),
+                  title: Text(l10n.latestBuildLabel),
+                  subtitle: Text('${c.latestBuild}'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _editBuildNumber(context, ref,
+                      l10n.latestBuildLabel, 'latest_build', c.latestBuild),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.lock_clock),
+                  title: Text(l10n.requireLatestToggle),
+                  subtitle: Text(l10n.requireLatestHint),
+                  value: c.requireLatest,
+                  onChanged: (v) =>
+                      _patch(context, ref, {'require_latest': v}),
                 ),
               ],
             ),
@@ -160,9 +177,11 @@ class AdminPanelScreen extends ConsumerWidget {
     });
   }
 
-  Future<void> _editMinBuild(
+  Future<void> _editBuildNumber(
     BuildContext context,
     WidgetRef ref,
+    String title,
+    String key,
     int current,
   ) async {
     final l10n = AppLocalizations.of(context);
@@ -171,7 +190,7 @@ class AdminPanelScreen extends ConsumerWidget {
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.minBuildLabel),
+        title: Text(title),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
@@ -191,6 +210,6 @@ class AdminPanelScreen extends ConsumerWidget {
       messenger.showSnackBar(SnackBar(content: Text(l10n.invalidNumber)));
       return;
     }
-    await _patch(context, ref, {'min_build': value});
+    await _patch(context, ref, {key: value});
   }
 }

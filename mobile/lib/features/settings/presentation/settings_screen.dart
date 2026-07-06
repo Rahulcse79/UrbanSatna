@@ -133,6 +133,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
             ),
           ),
+          Consumer(
+            builder: (context, ref, _) {
+              final latest = ref.watch(appConfigProvider).maybeWhen(
+                  data: (c) => c.latestBuild, orElse: () => 0);
+              if (latest <= Env.appBuild) return const SizedBox.shrink();
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '${l10n.updateAvailable} · v0.1.$latest',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.orange.shade800,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

@@ -13,6 +13,8 @@ const ALLOW_SERVER_URL_CHANGE: &str = "allow_server_url_change";
 const PROMO_BANNER: &str = "promo_banner";
 const MAINTENANCE_MODE: &str = "maintenance_mode";
 const MIN_BUILD: &str = "min_build";
+const LATEST_BUILD: &str = "latest_build";
+const REQUIRE_LATEST: &str = "require_latest";
 
 /// Runtime app configuration — the control plane the admin edits live
 /// (PRODUCT.md §6.5). Every field has a safe default so a missing row
@@ -24,7 +26,12 @@ pub struct AppConfig {
     pub promo_title: Option<String>,
     pub promo_subtitle: Option<String>,
     pub maintenance_mode: bool,
+    /// Hard floor: builds below this are always blocked.
     pub min_build: i64,
+    /// The newest released build (admin-maintained).
+    pub latest_build: i64,
+    /// Version gate: when on, only `latest_build` (or newer) may run.
+    pub require_latest: bool,
 }
 
 async fn load(state: &AppState) -> Result<AppConfig, AppError> {
@@ -41,6 +48,14 @@ async fn load(state: &AppState) -> Result<AppConfig, AppError> {
         .await?
         .and_then(|v| v.as_i64())
         .unwrap_or(0);
+    let latest_build = settings::get_json(&state.pg, LATEST_BUILD)
+        .await?
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let require_latest = settings::get_json(&state.pg, REQUIRE_LATEST)
+        .await?
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     Ok(AppConfig {
         allow_server_url_change: allow,
         promo_enabled: promo
@@ -60,6 +75,8 @@ async fn load(state: &AppState) -> Result<AppConfig, AppError> {
             .map(str::to_string),
         maintenance_mode: maintenance,
         min_build,
+        latest_build,
+        require_latest,
     })
 }
 
@@ -77,6 +94,8 @@ pub struct UpdateAppConfig {
     pub promo_subtitle: Option<String>,
     pub maintenance_mode: Option<bool>,
     pub min_build: Option<i64>,
+    pub latest_build: Option<i64>,
+    pub require_latest: Option<bool>,
 }
 
 /// Admin: toggle app behavior at runtime (perm settings:manage).
@@ -113,6 +132,17 @@ pub async fn update(
         }
         settings::set_json(&state.pg, MIN_BUILD, json!(min_build)).await?;
         changed.insert(MIN_BUILD.into(), json!(min_build));
+    }
+    if let Some(latest_build) = body.latest_build {
+        if latest_build < 0 {
+            return Err(AppError::Validation("latest_build must be >= 0".into()));
+        }
+        settings::set_json(&state.pg, LATEST_BUILD, json!(latest_build)).await?;
+        changed.insert(LATEST_BUILD.into(), json!(latest_build));
+    }
+    if let Some(require_latest) = body.require_latest {
+        settings::set_json(&state.pg, REQUIRE_LATEST, json!(require_latest)).await?;
+        changed.insert(REQUIRE_LATEST.into(), json!(require_latest));
     }
 
     if !changed.is_empty() {

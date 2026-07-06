@@ -10,6 +10,8 @@ class AppConfig {
     this.promoSubtitle,
     this.maintenanceMode = false,
     this.minBuild = 0,
+    this.latestBuild = 0,
+    this.requireLatest = false,
   });
 
   final bool allowServerUrlChange;
@@ -17,7 +19,18 @@ class AppConfig {
   final String? promoTitle;
   final String? promoSubtitle;
   final bool maintenanceMode;
+
+  /// Hard floor: builds below this are always blocked.
   final int minBuild;
+
+  /// Newest released build; with [requireLatest] on, older builds are
+  /// blocked until updated.
+  final int latestBuild;
+  final bool requireLatest;
+
+  /// The build a device must have to pass the version gate.
+  int get effectiveMinBuild =>
+      requireLatest && latestBuild > minBuild ? latestBuild : minBuild;
 }
 
 /// Remote, admin-controlled app configuration.
@@ -37,6 +50,8 @@ final appConfigProvider = FutureProvider.autoDispose<AppConfig>((ref) async {
       promoSubtitle: data['promo_subtitle'] as String?,
       maintenanceMode: data['maintenance_mode'] as bool? ?? false,
       minBuild: data['min_build'] as int? ?? 0,
+      latestBuild: data['latest_build'] as int? ?? 0,
+      requireLatest: data['require_latest'] as bool? ?? false,
     );
   } catch (_) {
     return const AppConfig(allowServerUrlChange: true);

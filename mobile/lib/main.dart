@@ -64,7 +64,11 @@ class _AppGate extends ConsumerWidget {
             .any((r) => r == 'admin' || r == 'super_admin') ??
         false;
     if (config != null && !isAdmin) {
-      if (config.minBuild > Env.appBuild) return const ForceUpdateScreen();
+      // Version gate: min_build floor, or latest_build when the admin
+      // has switched on "only latest version can run".
+      if (config.effectiveMinBuild > Env.appBuild) {
+        return const ForceUpdateScreen();
+      }
       // Maintenance never blocks the login screen (tokens == null):
       // otherwise a logged-out admin could not sign in to turn it off.
       if (config.maintenanceMode && tokens != null) {

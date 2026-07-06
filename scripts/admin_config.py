@@ -22,8 +22,9 @@ import json
 import sys
 import urllib.request
 
-BOOL_KEYS = {"maintenance_mode", "allow_server_url_change", "promo_enabled"}
-INT_KEYS = {"min_build"}
+BOOL_KEYS = {"maintenance_mode", "allow_server_url_change", "promo_enabled",
+             "require_latest"}
+INT_KEYS = {"min_build", "latest_build"}
 STR_KEYS = {"promo_title", "promo_subtitle"}
 
 

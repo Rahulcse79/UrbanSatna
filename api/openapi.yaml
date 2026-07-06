@@ -44,7 +44,9 @@ paths:
       tags: [system]
       summary: >-
         Public runtime config: {allow_server_url_change, promo_enabled,
-        promo_title?, promo_subtitle?, maintenance_mode, min_build}
+        promo_title?, promo_subtitle?, maintenance_mode, min_build,
+        latest_build, require_latest}. Version gate: app is blocked when
+        build < min_build, or build < latest_build while require_latest.
       responses: { "200": { description: config } }
     patch:
       tags: [system]
