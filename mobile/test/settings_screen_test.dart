@@ -62,19 +62,17 @@ void main() {
     expect(prefs.getString('server_url'), isNull);
   });
 
-  testWidgets('admin flag off locks the field and hides save',
+  testWidgets('admin flag off hides the server URL section entirely',
       (tester) async {
     final prefs = await _emptyPrefs();
     await tester.pumpWidget(_app(prefs, allowChange: false));
     await tester.pumpAndSettle();
 
-    final field = tester.widget<TextField>(find.byType(TextField));
-    expect(field.enabled, isFalse);
+    // Kill switch: no URL field, no buttons — the section is gone,
+    // but the theme setting remains available.
+    expect(find.byType(TextFormField), findsNothing);
     expect(find.text('Save'), findsNothing);
     expect(find.text('Reset to default'), findsNothing);
-    expect(
-      find.text('Server URL is managed by the administrator'),
-      findsOneWidget,
-    );
+    expect(find.text('Theme'), findsOneWidget);
   });
 }
