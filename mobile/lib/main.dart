@@ -6,6 +6,7 @@ import 'core/auth/auth_controller.dart';
 import 'core/config/server_url.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_mode.dart';
 import 'l10n/gen/app_localizations.dart';
 
 Future<void> main() async {
@@ -33,6 +34,7 @@ class ServexaApp extends ConsumerWidget {
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
+      themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

@@ -12,6 +12,8 @@ class Booking {
     this.note,
     this.rating,
     this.arrivalOtp,
+    this.customerPhone,
+    this.workerPhone,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
@@ -27,6 +29,8 @@ class Booking {
         note: json['note'] as String?,
         rating: json['rating'] as int?,
         arrivalOtp: json['arrival_otp'] as String?,
+        customerPhone: json['customer_phone'] as String?,
+        workerPhone: json['worker_phone'] as String?,
       );
 
   final String id;
@@ -43,6 +47,11 @@ class Booking {
 
   /// Present only in customer responses; workers never receive it.
   final String? arrivalOtp;
+
+  /// Contact exchange after accept: worker sees the customer's phone,
+  /// customer sees the worker's.
+  final String? customerPhone;
+  final String? workerPhone;
 
   String get priceLabel => '₹${(pricePaise / 100).toStringAsFixed(0)}';
   bool get cancellable => status == 'pending' || status == 'accepted';

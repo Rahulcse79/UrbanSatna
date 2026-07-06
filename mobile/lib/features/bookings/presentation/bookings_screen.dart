@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../data/bookings_repository.dart';
 import '../domain/booking.dart';
+
+/// Opens the phone dialer; used on both sides of a matched booking.
+Future<void> callNumber(String phone) =>
+    launchUrl(Uri(scheme: 'tel', path: phone));
 
 String statusLabel(AppLocalizations l10n, String status) => switch (status) {
       'pending' => l10n.statusPending,
@@ -212,7 +217,24 @@ class _BookingCard extends ConsumerWidget {
               ],
             ),
             if (booking.workerName != null)
-              Text('${l10n.technician}: ${booking.workerName}'),
+              Row(
+                children: [
+                  Expanded(
+                      child:
+                          Text('${l10n.technician}: ${booking.workerName}')),
+                  if (booking.workerPhone != null &&
+                      booking.progressStep > 0 &&
+                      booking.status != 'completed')
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(Icons.call,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.primary),
+                      tooltip: l10n.callLabel,
+                      onPressed: () => callNumber(booking.workerPhone!),
+                    ),
+                ],
+              ),
             Text(booking.address,
                 style: Theme.of(context).textTheme.bodySmall),
             if (booking.progressStep > 0 && booking.status != 'cancelled') ...[

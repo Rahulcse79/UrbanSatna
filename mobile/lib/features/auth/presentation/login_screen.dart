@@ -161,6 +161,9 @@ class _ServerUrlFooter extends ConsumerWidget {
         .watch(appConfigProvider)
         .maybeWhen(data: (c) => c.allowServerUrlChange, orElse: () => true);
 
+    // Admin kill switch: hide the server URL from the UI entirely.
+    if (!allowChange) return const SizedBox.shrink();
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -173,13 +176,12 @@ class _ServerUrlFooter extends ConsumerWidget {
                 ),
           ),
         ),
-        if (allowChange)
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.edit, size: 16),
-            tooltip: l10n.settingsTitle,
-            onPressed: () => context.push('/settings'),
-          ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.edit, size: 16),
+          tooltip: l10n.settingsTitle,
+          onPressed: () => context.push('/settings'),
+        ),
       ],
     );
   }

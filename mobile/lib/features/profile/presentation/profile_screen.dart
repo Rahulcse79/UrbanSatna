@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/network/api_client.dart';
@@ -13,6 +16,21 @@ final meProvider =
   final dio = ref.watch(dioProvider);
   final res = await dio.get<Map<String, dynamic>>('/api/v1/me');
   return unwrapEnvelope(res) as Map<String, dynamic>;
+});
+
+/// The user's profile picture bytes, or null when none is set.
+final avatarProvider = FutureProvider.autoDispose<Uint8List?>((ref) async {
+  final dio = ref.watch(dioProvider);
+  try {
+    final res = await dio.get<List<int>>(
+      '/api/v1/me/avatar',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final data = res.data;
+    return data == null ? null : Uint8List.fromList(data);
+  } on DioException {
+    return null; // 404 = no photo yet; network errors fall back to icon
+  }
 });
 
 class ProfileScreen extends ConsumerWidget {
@@ -38,10 +56,7 @@ class ProfileScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              const CircleAvatar(
-                radius: 40,
-                child: Icon(Icons.person, size: 48),
-              ),
+              const _AvatarPicker(),
               const SizedBox(height: 12),
               Center(
                 child: Text(
@@ -76,13 +91,15 @@ class ProfileScreen extends ConsumerWidget {
                 onTap: () => _editName(context, ref,
                     current: data['full_name'] as String? ?? ''),
               ),
-              if (!isWorker) const _WorkerApplicationTile(),
+              // Separation of duties: staff accounts never join the
+              // marketplace as workers (enforced server-side too).
+              if (!isWorker && !isAdmin) const _WorkerApplicationTile(),
               if (isAdmin)
                 ListTile(
-                  leading: const Icon(Icons.how_to_reg),
-                  title: Text(l10n.workerApprovals),
+                  leading: const Icon(Icons.admin_panel_settings),
+                  title: Text(l10n.adminPanel),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/admin/approvals'),
+                  onTap: () => context.push('/admin'),
                 ),
               ListTile(
                 leading: const Icon(Icons.settings),
@@ -138,6 +155,83 @@ class ProfileScreen extends ConsumerWidget {
     } on DioException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
     }
+  }
+}
+
+/// Profile picture with gallery picker: PNG/JPG under 1 MB (product rule;
+/// the backend enforces the same limits on magic bytes and size).
+class _AvatarPicker extends ConsumerWidget {
+  const _AvatarPicker();
+
+  static const _maxBytes = 1000000;
+
+  Future<void> _pick(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final picked = await ImagePicker()
+        .pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null) return;
+    final name = picked.name.toLowerCase();
+    final isPng = name.endsWith('.png');
+    final isJpg = name.endsWith('.jpg') || name.endsWith('.jpeg');
+    final bytes = await picked.readAsBytes();
+    if ((!isPng && !isJpg) || bytes.length > _maxBytes) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.avatarInvalid)));
+      return;
+    }
+    try {
+      await ref.read(dioProvider).post(
+            '/api/v1/me/avatar',
+            data: Stream.fromIterable([bytes]),
+            options: Options(
+              contentType: isPng ? 'image/png' : 'image/jpeg',
+              headers: {Headers.contentLengthHeader: bytes.length},
+            ),
+          );
+      ref.invalidate(avatarProvider);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.avatarUpdated)));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final avatar = ref.watch(avatarProvider);
+    final bytes = avatar.maybeWhen(data: (b) => b, orElse: () => null);
+    return Center(
+      child: Stack(
+        children: [
+          CircleAvatar(
+            radius: 44,
+            backgroundImage: bytes != null ? MemoryImage(bytes) : null,
+            child: bytes == null ? const Icon(Icons.person, size: 48) : null,
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Material(
+              color: Theme.of(context).colorScheme.primary,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => _pick(context, ref),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.photo_camera,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    semanticLabel: l10n.changePhoto,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

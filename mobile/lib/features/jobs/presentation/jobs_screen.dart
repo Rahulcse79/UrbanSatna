@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../bookings/data/bookings_repository.dart';
 import '../../bookings/domain/booking.dart';
 import '../../bookings/presentation/bookings_screen.dart'
-    show statusColor, statusLabel;
+    show callNumber, statusColor, statusLabel;
 
 /// Worker view: earnings, available jobs to accept, and assigned jobs
 /// to advance (mockup "Available Jobs" screen).
@@ -226,6 +227,26 @@ class _JobCard extends ConsumerWidget {
               ],
             ),
             Text(job.address, style: Theme.of(context).textTheme.bodySmall),
+            if (assigned)
+              Row(
+                children: [
+                  if (job.customerPhone != null)
+                    TextButton.icon(
+                      icon: const Icon(Icons.call, size: 18),
+                      label: Text(l10n.callLabel),
+                      onPressed: () => callNumber(job.customerPhone!),
+                    ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.directions, size: 18),
+                    label: Text(l10n.navigateLabel),
+                    onPressed: () => launchUrl(
+                      Uri.parse(
+                          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(job.address)}'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                  ),
+                ],
+              ),
             if (job.note != null && job.note!.isNotEmpty)
               Text('“${job.note}”',
                   style: Theme.of(context)
