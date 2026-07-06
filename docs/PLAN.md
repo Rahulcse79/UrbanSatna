@@ -3,6 +3,9 @@
 > Phased, vertical-slice roadmap. Each phase ships something testable
 > end-to-end. Do not start a phase before the previous phase's exit
 > criteria are met. Architecture rules live in [CLAUDE.md](../CLAUDE.md).
+> Product features & milestone order live in [PRODUCT.md](PRODUCT.md)
+> (M2 ≈ Phases 2–3 · M2.5 ≈ Phase 5 subset · M3 ≈ Phase 4 · M4 ≈ Phases 5–6).
+> PRODUCT.md decides *what*, this file decides *done-when*.
 
 ---
 
@@ -151,4 +154,9 @@ adding it later is additive, not a rewrite.
 | Worker supply cold-start in Satna | Cash-first payments, manual dispatch fallback     |
 | SQLx compile-time queries in CI   | Commit `sqlx prepare` offline metadata            |
 | FCM delivery unreliability        | Dispatch timeout + re-offer loop, SMS fallback    |
+| Cash bookings dodge commission    | Worker dues ledger + auto-pause over cap (PRODUCT §12.1) |
+| `DEV_RETURN_OTP` account takeover | Real SMS + flag off = hard launch gate (PRODUCT §12.2) |
+| Unverified workers accept jobs    | KYC verified-only accept gate ships with Phase 2–3 work |
+| Render free tier (sleep, 90-day PG expiry, no backups) | Paid tier/VPS + nightly dump before launch (PRODUCT §12.5) |
+| Google Maps API cost blowout      | Per-job Directions, ≥60 s ETA refresh, cached geocodes (PRODUCT §4) |
 | Scope creep (the enemy)           | This file. New scope goes to Phase 7+, not v1.    |
