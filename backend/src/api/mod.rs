@@ -3,10 +3,14 @@ pub mod app_config;
 pub mod auth;
 pub mod bookings;
 pub mod catalog;
+pub mod chat;
+pub mod coupons;
 pub mod envelope;
 pub mod health;
 pub mod me;
+pub mod tickets;
 
+use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderName, Request};
 use axum::routing::{get, patch, post};
 use axum::Router;
@@ -85,8 +89,32 @@ pub fn router(state: AppState) -> Router {
         .route("/jobs/available", get(bookings::available_jobs))
         .route("/jobs/mine", get(bookings::my_jobs))
         .route("/jobs/earnings", get(bookings::earnings))
+        .route("/jobs/history", get(bookings::history))
         .route("/bookings/{id}/accept", post(bookings::accept))
-        .route("/bookings/{id}/status", patch(bookings::advance));
+        .route("/bookings/{id}/status", patch(bookings::advance))
+        // coupons (check for the booking screen; admin CRUD)
+        .route("/coupons/check", get(coupons::check))
+        .route("/admin/coupons", get(coupons::list).post(coupons::create))
+        .route("/admin/coupons/{id}", patch(coupons::update))
+        // support tickets
+        .route("/tickets", post(tickets::create))
+        .route("/tickets/mine", get(tickets::mine))
+        .route("/admin/tickets", get(tickets::list))
+        .route("/admin/tickets/{id}/resolve", post(tickets::resolve))
+        // booking chat (media uploads get a bigger body budget)
+        .route(
+            "/bookings/{id}/messages",
+            get(chat::list).post(chat::send_text),
+        )
+        .route(
+            "/bookings/{id}/messages/attachment",
+            post(chat::send_attachment)
+                .layer(DefaultBodyLimit::max(chat::MAX_ATTACHMENT_BYTES + 1024)),
+        )
+        .route(
+            "/bookings/{id}/messages/{mid}/attachment",
+            get(chat::attachment),
+        );
 
     Router::new()
         .route("/health", get(health::health))

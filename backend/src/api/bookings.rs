@@ -16,6 +16,10 @@ pub struct NewBooking {
     pub service_id: Uuid,
     pub address: String,
     pub note: Option<String>,
+    /// Optional GPS pin the customer chose to share.
+    pub lat: Option<f64>,
+    pub lng: Option<f64>,
+    pub coupon_code: Option<String>,
 }
 
 pub async fn create(
@@ -56,12 +60,20 @@ pub async fn create(
             "you already have {active} active bookings — complete or cancel one first"
         )));
     }
+    if body.lat.is_some_and(|v| !(-90.0..=90.0).contains(&v))
+        || body.lng.is_some_and(|v| !(-180.0..=180.0).contains(&v))
+    {
+        return Err(AppError::Validation("invalid coordinates".into()));
+    }
     let booking = bookings::create(
         &state.pg,
         current.id,
         body.service_id,
         body.address.trim(),
         body.note.as_deref(),
+        body.lat,
+        body.lng,
+        body.coupon_code.as_deref(),
     )
     .await?;
     audit::log(
@@ -71,7 +83,12 @@ pub async fn create(
         "booking.created",
         "booking",
         Some(booking.id),
-        Some(json!({ "service_id": booking.service_id, "price_paise": booking.price_paise })),
+        Some(json!({
+            "service_id": booking.service_id,
+            "price_paise": booking.price_paise,
+            "discount_paise": booking.discount_paise,
+            "coupon_code": booking.coupon_code,
+        })),
     )
     .await?;
     Ok(Json(ApiResponse::ok(booking)))
@@ -124,6 +141,17 @@ pub async fn earnings(
     Ok(Json(ApiResponse::ok(
         bookings::earnings(&state.pg, current.id).await?,
     )))
+}
+
+/// Worker payment history: completed jobs, newest first.
+pub async fn history(
+    State(state): State<AppState>,
+    current: CurrentUser,
+) -> Result<Json<ApiResponse<Vec<bookings::Booking>>>, AppError> {
+    current.require_role("worker")?;
+    Ok(Json(ApiResponse::ok(bookings::redact_all_for_worker(
+        bookings::worker_history(&state.pg, current.id).await?,
+    ))))
 }
 
 pub async fn accept(

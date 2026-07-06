@@ -4,6 +4,7 @@ use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use super::coupons;
 use crate::domain::booking as bk;
 use crate::domain::error::AppError;
 
@@ -34,6 +35,12 @@ pub struct Booking {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arrival_otp: Option<String>,
     pub cancel_reason: Option<String>,
+    /// Customer-shared GPS pin (optional, for precise navigation).
+    pub lat: Option<f64>,
+    pub lng: Option<f64>,
+    /// price_paise is the FINAL charged amount; these record the deal.
+    pub coupon_code: Option<String>,
+    pub discount_paise: i64,
     pub created_at: DateTime<Utc>,
     pub accepted_at: Option<DateTime<Utc>>,
     pub arrived_at: Option<DateTime<Utc>>,
@@ -63,6 +70,7 @@ const SELECT: &str = "SELECT b.id, b.status, b.service_id, s.name AS service_nam
        cu.phone AS customer_phone, b.worker_id, w.full_name AS worker_name,
        w.phone AS worker_phone, b.address, b.note,
        b.price_paise, b.rating, b.review, b.arrival_otp, b.cancel_reason,
+       b.lat, b.lng, b.coupon_code, b.discount_paise,
        b.created_at, b.accepted_at, b.arrived_at, b.completed_at, b.cancelled_at
   FROM bookings b
   JOIN services s ON s.id = b.service_id
@@ -78,35 +86,81 @@ pub async fn get(pg: &PgPool, id: Uuid) -> Result<Booking, AppError> {
         .ok_or(AppError::NotFound("booking"))
 }
 
-/// Creates a booking, snapshotting the service price.
+/// Creates a booking, snapshotting the (coupon-discounted) service price.
+/// Coupon redemption commits atomically with the booking — the redemption
+/// PK enforces one-use-per-user even under concurrent requests.
+#[allow(clippy::too_many_arguments)]
 pub async fn create(
     pg: &PgPool,
     customer_id: Uuid,
     service_id: Uuid,
     address: &str,
     note: Option<&str>,
+    lat: Option<f64>,
+    lng: Option<f64>,
+    coupon_code: Option<&str>,
 ) -> Result<Booking, AppError> {
+    let base: Option<i64> = sqlx::query_scalar(
+        "SELECT base_price_paise FROM services
+         WHERE id = $1 AND is_active AND deleted_at IS NULL",
+    )
+    .bind(service_id)
+    .fetch_optional(pg)
+    .await?;
+    let Some(base_price) = base else {
+        return Err(AppError::NotFound("service"));
+    };
+
+    let code = coupon_code
+        .map(str::trim)
+        .filter(|c| !c.is_empty())
+        .map(str::to_uppercase);
+    let (coupon_id, discount) = match code.as_deref() {
+        Some(c) => {
+            let (id, d) = coupons::preview(pg, c, customer_id, base_price).await?;
+            (Some(id), d)
+        }
+        None => (None, 0),
+    };
+
     let id = Uuid::now_v7();
     // Arrival OTP: shown only to the customer; the worker must hear it at
     // the door to start the job (never logged — CLAUDE.md §8).
     let arrival_otp = format!("{:04}", rand::thread_rng().gen_range(0..10_000));
-    let inserted = sqlx::query(
-        "INSERT INTO bookings (id, customer_id, service_id, status, address, note, price_paise, arrival_otp)
-         SELECT $1, $2, s.id, 'pending', $4, $5, s.base_price_paise, $6
-         FROM services s
-         WHERE s.id = $3 AND s.is_active AND s.deleted_at IS NULL",
+    let mut tx = pg.begin().await?;
+    sqlx::query(
+        "INSERT INTO bookings (id, customer_id, service_id, status, address, note,
+                               price_paise, arrival_otp, lat, lng, coupon_code, discount_paise)
+         VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10, $11)",
     )
     .bind(id)
     .bind(customer_id)
     .bind(service_id)
     .bind(address)
     .bind(note)
+    .bind(base_price - discount)
     .bind(&arrival_otp)
-    .execute(pg)
+    .bind(lat)
+    .bind(lng)
+    .bind(&code)
+    .bind(discount)
+    .execute(&mut *tx)
     .await?;
-    if inserted.rows_affected() == 0 {
-        return Err(AppError::NotFound("service"));
+    if let Some(coupon_id) = coupon_id {
+        let redeemed = sqlx::query(
+            "INSERT INTO coupon_redemptions (coupon_id, user_id, booking_id)
+             VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+        )
+        .bind(coupon_id)
+        .bind(customer_id)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+        if redeemed.rows_affected() == 0 {
+            return Err(AppError::Conflict("coupon already used".into()));
+        }
     }
+    tx.commit().await?;
     get(pg, id).await
 }
 
@@ -282,6 +336,9 @@ pub async fn rate(
 pub struct Earnings {
     pub completed_jobs: i64,
     pub total_paise: i64,
+    pub today_paise: i64,
+    pub week_paise: i64,
+    pub month_paise: i64,
     pub avg_rating: Option<f64>,
 }
 
@@ -289,10 +346,27 @@ pub async fn earnings(pg: &PgPool, worker_id: Uuid) -> Result<Earnings, AppError
     Ok(sqlx::query_as::<_, Earnings>(
         "SELECT count(*) AS completed_jobs,
                 COALESCE(sum(price_paise), 0)::bigint AS total_paise,
+                COALESCE(sum(price_paise) FILTER
+                    (WHERE completed_at >= date_trunc('day', now())), 0)::bigint AS today_paise,
+                COALESCE(sum(price_paise) FILTER
+                    (WHERE completed_at >= date_trunc('week', now())), 0)::bigint AS week_paise,
+                COALESCE(sum(price_paise) FILTER
+                    (WHERE completed_at >= date_trunc('month', now())), 0)::bigint AS month_paise,
                 avg(rating)::float8 AS avg_rating
          FROM bookings WHERE worker_id = $1 AND status = 'completed'",
     )
     .bind(worker_id)
     .fetch_one(pg)
+    .await?)
+}
+
+/// Worker payment history: completed jobs, newest first.
+pub async fn worker_history(pg: &PgPool, worker_id: Uuid) -> Result<Vec<Booking>, AppError> {
+    Ok(sqlx::query_as::<_, Booking>(&format!(
+        "{SELECT} WHERE b.worker_id = $1 AND b.status = 'completed'
+         ORDER BY b.completed_at DESC LIMIT 100"
+    ))
+    .bind(worker_id)
+    .fetch_all(pg)
     .await?)
 }

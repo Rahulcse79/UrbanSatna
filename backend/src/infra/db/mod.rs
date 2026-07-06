@@ -1,8 +1,11 @@
 pub mod audit;
 pub mod bookings;
 pub mod catalog;
+pub mod chat;
+pub mod coupons;
 pub mod sessions;
 pub mod settings;
+pub mod tickets;
 pub mod users;
 pub mod workers;
 
