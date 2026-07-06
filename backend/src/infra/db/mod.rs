@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod sessions;
 pub mod settings;
 pub mod users;
+pub mod workers;
 
 use std::time::Duration;
 

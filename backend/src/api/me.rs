@@ -1,11 +1,10 @@
 use axum::extract::State;
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 use super::envelope::ApiResponse;
 use crate::domain::error::AppError;
-use crate::infra::db::{audit, users};
+use crate::infra::db::{audit, users, workers};
 use crate::middleware::auth::CurrentUser;
 use crate::state::AppState;
 
@@ -61,26 +60,47 @@ pub async fn update_me(
     Ok(Json(ApiResponse::ok(user)))
 }
 
-/// Self-service worker signup for the test phase. Real KYC/verification
-/// replaces this in the admin flow (PLAN.md Phase 2).
-pub async fn become_worker(
+#[derive(Deserialize, Default)]
+pub struct WorkerApplicationBody {
+    pub skills: Option<String>,
+    pub experience: Option<String>,
+}
+
+/// Apply to become a worker. The worker role is granted only when an admin
+/// approves the application (verified-only accept gate, PRODUCT.md §12.3).
+/// Also mounted on the legacy /me/become-worker route, so old APKs get a
+/// pending application instead of an instant role.
+pub async fn apply_worker(
     State(state): State<AppState>,
     current: CurrentUser,
-) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
-    users::grant_role(&state.pg, current.id, "worker").await?;
+    body: Option<Json<WorkerApplicationBody>>,
+) -> Result<Json<ApiResponse<workers::WorkerApplication>>, AppError> {
+    let body = body.map(|Json(b)| b).unwrap_or_default();
+    let application = workers::apply(
+        &state.pg,
+        current.id,
+        body.skills.as_deref(),
+        body.experience.as_deref(),
+    )
+    .await?;
     audit::log(
         &state.pg,
         Some(current.id),
         "customer",
-        "user.became_worker",
-        "user",
-        Some(current.id),
+        "worker.applied",
+        "worker_application",
+        Some(application.id),
         None,
     )
     .await?;
-    // Roles live in the JWT; a refresh picks up the new role.
-    Ok(Json(ApiResponse::ok(json!({
-        "worker": true,
-        "note": "refresh your token to activate the worker role"
-    }))))
+    Ok(Json(ApiResponse::ok(application)))
+}
+
+pub async fn my_worker_application(
+    State(state): State<AppState>,
+    current: CurrentUser,
+) -> Result<Json<ApiResponse<Option<workers::WorkerApplication>>>, AppError> {
+    Ok(Json(ApiResponse::ok(
+        workers::latest_for_user(&state.pg, current.id).await?,
+    )))
 }

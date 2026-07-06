@@ -69,9 +69,9 @@ pub async fn available_jobs(
     current: CurrentUser,
 ) -> Result<Json<ApiResponse<Vec<bookings::Booking>>>, AppError> {
     current.require_role("worker")?;
-    Ok(Json(ApiResponse::ok(
+    Ok(Json(ApiResponse::ok(bookings::redact_all_for_worker(
         bookings::available(&state.pg, current.id).await?,
-    )))
+    ))))
 }
 
 pub async fn my_jobs(
@@ -79,9 +79,9 @@ pub async fn my_jobs(
     current: CurrentUser,
 ) -> Result<Json<ApiResponse<Vec<bookings::Booking>>>, AppError> {
     current.require_role("worker")?;
-    Ok(Json(ApiResponse::ok(
+    Ok(Json(ApiResponse::ok(bookings::redact_all_for_worker(
         bookings::my_jobs(&state.pg, current.id).await?,
-    )))
+    ))))
 }
 
 pub async fn earnings(
@@ -111,12 +111,14 @@ pub async fn accept(
         None,
     )
     .await?;
-    Ok(Json(ApiResponse::ok(booking)))
+    Ok(Json(ApiResponse::ok(booking.redact_for_worker())))
 }
 
 #[derive(Deserialize)]
 pub struct StatusAction {
-    pub action: String, // en_route | start | complete
+    pub action: String, // en_route | arrived | start | complete
+    /// Customer's arrival OTP; required for `start`.
+    pub otp: Option<String>,
 }
 
 pub async fn advance(
@@ -126,7 +128,8 @@ pub async fn advance(
     Json(body): Json<StatusAction>,
 ) -> Result<Json<ApiResponse<bookings::Booking>>, AppError> {
     current.require_role("worker")?;
-    let booking = bookings::advance(&state.pg, id, current.id, &body.action).await?;
+    let booking =
+        bookings::advance(&state.pg, id, current.id, &body.action, body.otp.as_deref()).await?;
     audit::log(
         &state.pg,
         Some(current.id),
@@ -137,7 +140,7 @@ pub async fn advance(
         Some(json!({ "action": body.action, "status": booking.status })),
     )
     .await?;
-    Ok(Json(ApiResponse::ok(booking)))
+    Ok(Json(ApiResponse::ok(booking.redact_for_worker())))
 }
 
 pub async fn cancel(

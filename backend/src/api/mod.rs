@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod app_config;
 pub mod auth;
 pub mod bookings;
@@ -36,7 +37,21 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/logout", post(auth::logout))
         // profile
         .route("/me", get(me::get_me).patch(me::update_me))
-        .route("/me/become-worker", post(me::become_worker))
+        .route(
+            "/me/worker-application",
+            get(me::my_worker_application).post(me::apply_worker),
+        )
+        // legacy alias: old APKs now create an application, not a role
+        .route("/me/become-worker", post(me::apply_worker))
+        // admin: worker verification queue
+        .route(
+            "/admin/worker-applications",
+            get(admin::list_worker_applications),
+        )
+        .route(
+            "/admin/worker-applications/{id}/decide",
+            post(admin::decide_worker_application),
+        )
         // catalog (public reads, admin writes)
         .route(
             "/categories",

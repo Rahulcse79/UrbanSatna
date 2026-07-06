@@ -20,3 +20,7 @@ mobile/*.iml
 .idea/
 .vscode/
 .DS_Store
+
+# Redis dumps — runtime artifacts, never in git
+dump.rdb
+**/dump.rdb

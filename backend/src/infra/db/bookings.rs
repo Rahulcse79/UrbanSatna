@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use rand::Rng;
 use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -22,13 +23,28 @@ pub struct Booking {
     pub price_paise: i64,
     pub rating: Option<i32>,
     pub review: Option<String>,
+    /// Customer-only field: workers verify it at the door, they never see it.
+    /// Worker-facing handlers must call `redact_for_worker` before responding.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arrival_otp: Option<String>,
     pub created_at: DateTime<Utc>,
+}
+
+impl Booking {
+    pub fn redact_for_worker(mut self) -> Self {
+        self.arrival_otp = None;
+        self
+    }
+}
+
+pub fn redact_all_for_worker(list: Vec<Booking>) -> Vec<Booking> {
+    list.into_iter().map(Booking::redact_for_worker).collect()
 }
 
 const SELECT: &str = "SELECT b.id, b.status, b.service_id, s.name AS service_name,
        c.name AS category_name, b.customer_id, cu.full_name AS customer_name,
        b.worker_id, w.full_name AS worker_name, b.address, b.note,
-       b.price_paise, b.rating, b.review, b.created_at
+       b.price_paise, b.rating, b.review, b.arrival_otp, b.created_at
   FROM bookings b
   JOIN services s ON s.id = b.service_id
   JOIN categories c ON c.id = s.category_id
@@ -52,9 +68,12 @@ pub async fn create(
     note: Option<&str>,
 ) -> Result<Booking, AppError> {
     let id = Uuid::now_v7();
+    // Arrival OTP: shown only to the customer; the worker must hear it at
+    // the door to start the job (never logged — CLAUDE.md §8).
+    let arrival_otp = format!("{:04}", rand::thread_rng().gen_range(0..10_000));
     let inserted = sqlx::query(
-        "INSERT INTO bookings (id, customer_id, service_id, status, address, note, price_paise)
-         SELECT $1, $2, s.id, 'pending', $4, $5, s.base_price_paise
+        "INSERT INTO bookings (id, customer_id, service_id, status, address, note, price_paise, arrival_otp)
+         SELECT $1, $2, s.id, 'pending', $4, $5, s.base_price_paise, $6
          FROM services s
          WHERE s.id = $3 AND s.is_active AND s.deleted_at IS NULL",
     )
@@ -63,6 +82,7 @@ pub async fn create(
     .bind(service_id)
     .bind(address)
     .bind(note)
+    .bind(&arrival_otp)
     .execute(pg)
     .await?;
     if inserted.rows_affected() == 0 {
@@ -128,26 +148,41 @@ pub async fn accept(pg: &PgPool, id: Uuid, worker_id: Uuid) -> Result<Booking, A
     get(pg, id).await
 }
 
-/// Assigned worker advances the state machine (en_route/start/complete).
+/// Assigned worker advances the state machine (en_route/arrived/start/complete).
+/// `start` additionally requires the customer's arrival OTP.
 pub async fn advance(
     pg: &PgPool,
     id: Uuid,
     worker_id: Uuid,
     action: &str,
+    otp: Option<&str>,
 ) -> Result<Booking, AppError> {
     let booking = get(pg, id).await?;
     if booking.worker_id != Some(worker_id) {
         return Err(AppError::Forbidden);
     }
     let next = bk::next_status_for_action(action, &booking.status)?;
+    if bk::action_needs_otp(action) {
+        let expected = booking.arrival_otp.as_deref().unwrap_or_default();
+        if expected.is_empty() || otp.map(str::trim) != Some(expected) {
+            return Err(AppError::OtpInvalid);
+        }
+    }
     let completed_at = if next == bk::COMPLETED {
+        Some(Utc::now())
+    } else {
+        None
+    };
+    let arrived_at = if next == bk::ARRIVED {
         Some(Utc::now())
     } else {
         None
     };
     // Guard on current status again so concurrent transitions can't skip states.
     let updated = sqlx::query(
-        "UPDATE bookings SET status = $3, completed_at = COALESCE($4, completed_at)
+        "UPDATE bookings SET status = $3,
+                completed_at = COALESCE($4, completed_at),
+                arrived_at = COALESCE($6, arrived_at)
          WHERE id = $1 AND worker_id = $2 AND status = $5",
     )
     .bind(id)
@@ -155,6 +190,7 @@ pub async fn advance(
     .bind(next)
     .bind(completed_at)
     .bind(&booking.status)
+    .bind(arrived_at)
     .execute(pg)
     .await?;
     if updated.rows_affected() == 0 {
