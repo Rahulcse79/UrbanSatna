@@ -68,19 +68,31 @@ jobs:
           fi
           grep -E 'INTERNET|usesCleartextTraffic|android:label|queries' "$MANIFEST"
 
+      # Deterministic signing: the committed test keystore means every CI
+      # build has the same signature, so phones update in place instead of
+      # demanding an uninstall. Replace with a real keystore for Play Store.
+      - name: Stable debug signing key
+        run: |
+          mkdir -p ~/.android
+          cp ci/debug.keystore ~/.android/debug.keystore
+
       - name: Dependencies
         run: flutter pub get
 
       - name: Generate localizations
         run: flutter gen-l10n
 
-      # APP_BUILD = CI run number: monotonic, shown in Settings, compared
-      # against the admin-set min_build flag for force updates.
+      # Versioning: versionName 0.1.<run>, versionCode <run> — monotonic,
+      # so Android accepts every new build as an upgrade. APP_BUILD is the
+      # same number, shown in Settings and compared against the admin-set
+      # min_build flag for force updates.
       - name: Build APK
         env:
           API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL }}
         run: >
           flutter build apk --release
+          --build-name=0.1.${{ github.run_number }}
+          --build-number=${{ github.run_number }}
           --dart-define=API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8080}"
           --dart-define=APP_BUILD=${{ github.run_number }}
 
@@ -89,6 +101,8 @@ jobs:
           API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL }}
         run: >
           flutter build appbundle --release
+          --build-name=0.1.${{ github.run_number }}
+          --build-number=${{ github.run_number }}
           --dart-define=API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8080}"
           --dart-define=APP_BUILD=${{ github.run_number }}
 
@@ -139,6 +153,8 @@ jobs:
           API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL }}
         run: >
           flutter build ios --release --no-codesign
+          --build-name=0.1.${{ github.run_number }}
+          --build-number=${{ github.run_number }}
           --dart-define=API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8080}"
           --dart-define=APP_BUILD=${{ github.run_number }}
 

@@ -127,7 +127,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
           Center(
             child: Text(
-              'Servexa · build ${Env.appBuild}',
+              'Servexa v0.1.${Env.appBuild}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),

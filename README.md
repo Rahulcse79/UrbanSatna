@@ -92,6 +92,47 @@ compared against the admin `min_build` flag for force updates.
 SMS gateway is wired yet. Both are launch gates — see
 [docs/PRODUCT.md §12](docs/PRODUCT.md).
 
+## Break glass: flip flags without the app
+
+Admins bypass maintenance mode in the app, and the login screen is never
+blocked — but if you're ever locked out anyway, every flag is one API
+call away:
+
+```bash
+# One-liner tool (asks the server for the OTP while DEV_RETURN_OTP=true):
+./scripts/admin_config.py https://urbansatna.onrender.com +91XXXXXXXXXX \
+    set maintenance_mode false
+```
+
+Or raw curl, three steps:
+
+```bash
+BASE=https://urbansatna.onrender.com
+# 1. request OTP (dev mode echoes it back as data.dev_otp)
+curl -s -X POST $BASE/api/v1/auth/otp/request \
+  -H 'content-type: application/json' -d '{"phone":"+91XXXXXXXXXX"}'
+# 2. verify -> copy data.access_token
+curl -s -X POST $BASE/api/v1/auth/otp/verify \
+  -H 'content-type: application/json' \
+  -d '{"phone":"+91XXXXXXXXXX","otp":"<OTP>","device":"cli"}'
+# 3. turn maintenance off (admin token required)
+curl -s -X PATCH $BASE/api/v1/app-config \
+  -H "authorization: Bearer <ACCESS_TOKEN>" \
+  -H 'content-type: application/json' -d '{"maintenance_mode":false}'
+```
+
+The same PATCH accepts `allow_server_url_change`, `promo_enabled`,
+`promo_title`, `promo_subtitle`, and `min_build`.
+
+## Versioning
+
+Every CI build stamps three matching numbers from the Actions run number:
+Android `versionCode`, `versionName` (`0.1.<run>`), and the in-app
+`APP_BUILD` (Settings footer shows `Servexa v0.1.<run>`). Builds are signed
+with the committed **test** keystore (`mobile/ci/debug.keystore`) so a new
+APK installs over the old one without uninstalling — replace it with a real
+keystore before any Play Store upload.
+
 ## Verifying
 
 ```bash
