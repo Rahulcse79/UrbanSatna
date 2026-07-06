@@ -76,8 +76,11 @@ class BookingsRepository {
 
   Future<void> accept(String id) => _dio.post('/api/v1/bookings/$id/accept');
 
-  Future<void> advance(String id, String action) =>
-      _dio.patch('/api/v1/bookings/$id/status', data: {'action': action});
+  Future<void> advance(String id, String action, {String? otp}) =>
+      _dio.patch('/api/v1/bookings/$id/status', data: {
+        'action': action,
+        if (otp != null && otp.isNotEmpty) 'otp': otp,
+      });
 
   Future<void> cancel(String id) => _dio.post('/api/v1/bookings/$id/cancel');
 

@@ -10,6 +10,7 @@ String statusLabel(AppLocalizations l10n, String status) => switch (status) {
       'pending' => l10n.statusPending,
       'accepted' => l10n.statusAccepted,
       'en_route' => l10n.statusEnRoute,
+      'arrived' => l10n.statusArrived,
       'in_progress' => l10n.statusInProgress,
       'completed' => l10n.statusCompleted,
       'cancelled' => l10n.statusCancelled,
@@ -19,6 +20,7 @@ String statusLabel(AppLocalizations l10n, String status) => switch (status) {
 Color statusColor(BuildContext context, String status) => switch (status) {
       'pending' => Colors.orange,
       'accepted' || 'en_route' => Colors.blue,
+      'arrived' => Colors.deepPurple,
       'in_progress' => Colors.teal,
       'completed' => Colors.green,
       'cancelled' => Theme.of(context).colorScheme.error,
@@ -89,6 +91,83 @@ class _BookingsList extends ConsumerWidget {
   }
 }
 
+/// Compact 5-segment stepper:
+/// Accepted → On the way → Arrived → Working → Done.
+class _ProgressTimeline extends StatelessWidget {
+  const _ProgressTimeline({required this.step});
+
+  final int step;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        for (var i = 0; i < 5; i++) ...[
+          Expanded(
+            child: Container(
+              height: 4,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(2),
+                color: i < step ? scheme.primary : scheme.outlineVariant,
+              ),
+            ),
+          ),
+          if (i < 4) const SizedBox(width: 4),
+        ],
+      ],
+    );
+  }
+}
+
+/// The trust handshake: customer shares this code at the door; the worker
+/// cannot start the job without it.
+class _ArrivalOtpBox extends StatelessWidget {
+  const _ArrivalOtpBox({required this.otp});
+
+  final String otp;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final bg = dark
+        ? Colors.amber.shade900.withValues(alpha: 0.3)
+        : Colors.amber.shade50;
+    final fg = dark ? Colors.amber.shade200 : Colors.amber.shade900;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: fg.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.otpShareHint,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: fg),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            otp.split('').join(' '),
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 6,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BookingCard extends ConsumerWidget {
   const _BookingCard({required this.booking, required this.scope});
 
@@ -136,6 +215,14 @@ class _BookingCard extends ConsumerWidget {
               Text('${l10n.technician}: ${booking.workerName}'),
             Text(booking.address,
                 style: Theme.of(context).textTheme.bodySmall),
+            if (booking.progressStep > 0 && booking.status != 'cancelled') ...[
+              const SizedBox(height: 10),
+              _ProgressTimeline(step: booking.progressStep),
+            ],
+            if (booking.showArrivalOtp) ...[
+              const SizedBox(height: 10),
+              _ArrivalOtpBox(otp: booking.arrivalOtp!),
+            ],
             const SizedBox(height: 4),
             Row(
               children: [

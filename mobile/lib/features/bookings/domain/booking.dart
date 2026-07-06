@@ -11,6 +11,7 @@ class Booking {
     this.customerName,
     this.note,
     this.rating,
+    this.arrivalOtp,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
@@ -25,6 +26,7 @@ class Booking {
         customerName: json['customer_name'] as String?,
         note: json['note'] as String?,
         rating: json['rating'] as int?,
+        arrivalOtp: json['arrival_otp'] as String?,
       );
 
   final String id;
@@ -39,14 +41,33 @@ class Booking {
   final String? note;
   final int? rating;
 
+  /// Present only in customer responses; workers never receive it.
+  final String? arrivalOtp;
+
   String get priceLabel => '₹${(pricePaise / 100).toStringAsFixed(0)}';
   bool get cancellable => status == 'pending' || status == 'accepted';
   bool get ratable => status == 'completed' && rating == null;
 
+  /// Show the arrival OTP once a worker is assigned, until work starts.
+  bool get showArrivalOtp =>
+      arrivalOtp != null &&
+      const {'accepted', 'en_route', 'arrived'}.contains(status);
+
+  /// 0 = not started, 1..5 = Accepted → On the way → Arrived → Working → Done.
+  int get progressStep => switch (status) {
+        'accepted' => 1,
+        'en_route' => 2,
+        'arrived' => 3,
+        'in_progress' => 4,
+        'completed' => 5,
+        _ => 0,
+      };
+
   /// Worker's next action in the state machine, or null when none.
   String? get nextWorkerAction => switch (status) {
         'accepted' => 'en_route',
-        'en_route' => 'start',
+        'en_route' => 'arrived',
+        'arrived' => 'start',
         'in_progress' => 'complete',
         _ => null,
       };

@@ -149,10 +149,43 @@ class _JobCard extends ConsumerWidget {
   String _actionLabel(AppLocalizations l10n, String action) =>
       switch (action) {
         'en_route' => l10n.actionEnRoute,
+        'arrived' => l10n.actionArrived,
         'start' => l10n.actionStart,
         'complete' => l10n.actionComplete,
         _ => action,
       };
+
+  /// `start` needs the customer's 4-digit arrival OTP (trust handshake).
+  Future<String?> _askOtp(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.enterOtpTitle),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          maxLength: 4,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 24, letterSpacing: 8),
+          decoration: InputDecoration(
+            helperText: l10n.enterOtpHint,
+            border: const OutlineInputBorder(),
+            counterText: '',
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: Text(l10n.actionStart),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -225,8 +258,13 @@ class _JobCard extends ConsumerWidget {
                 else if (action != null)
                   FilledButton(
                     onPressed: () async {
+                      String? otp;
+                      if (action == 'start') {
+                        otp = await _askOtp(context);
+                        if (otp == null || otp.length != 4) return;
+                      }
                       try {
-                        await repo.advance(job.id, action);
+                        await repo.advance(job.id, action, otp: otp);
                         onAction();
                       } catch (e) {
                         messenger.showSnackBar(

@@ -3,8 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../bookings/data/bookings_repository.dart';
+import '../../bookings/presentation/bookings_screen.dart'
+    show statusColor, statusLabel;
 import '../../catalog/data/catalog_repository.dart';
 import '../../catalog/domain/models.dart';
+import '../../shell/current_tab.dart';
 
 IconData categoryIcon(String? key) => switch (key) {
       'electrician' => Icons.electrical_services,
@@ -16,60 +20,248 @@ IconData categoryIcon(String? key) => switch (key) {
       _ => Icons.home_repair_service,
     };
 
-/// Customer home: the "Explore Services" category grid from the mockup.
-class HomeScreen extends ConsumerWidget {
+/// Tinted tile palette: each category gets its own soft color so the
+/// grid feels alive (PRODUCT.md §6, "signature screens").
+(Color, Color) categoryTint(BuildContext context, int index) {
+  const swatches = <MaterialColor>[
+    Colors.indigo,
+    Colors.blue,
+    Colors.cyan,
+    Colors.orange,
+    Colors.green,
+    Colors.pink,
+    Colors.purple,
+    Colors.teal,
+  ];
+  final s = swatches[index % swatches.length];
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return dark
+      ? (s.shade900.withValues(alpha: 0.35), s.shade200)
+      : (s.shade50, s.shade700);
+}
+
+/// Customer home v2: location chip, greeting, search, promo banner,
+/// tinted category grid, pinned active-booking bar.
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final categories = ref.watch(categoriesProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.appTitle),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: l10n.settingsTitle,
-            onPressed: () => context.push('/settings'),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            categories.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => _Unreachable(
+                onRetry: () => ref.invalidate(categoriesProvider),
+                onSetServerUrl: () => context.push('/settings'),
+              ),
+              data: (items) {
+                final q = _query.trim().toLowerCase();
+                final filtered = q.isEmpty
+                    ? items
+                    : items
+                        .where((c) => c.name.toLowerCase().contains(q))
+                        .toList();
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    ref.invalidate(categoriesProvider);
+                    ref.invalidate(myBookingsProvider('active'));
+                  },
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+                        sliver: SliverToBoxAdapter(child: _header(context)),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: Text(
+                            l10n.greetingTitle,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        sliver: SliverToBoxAdapter(child: _searchBar(context)),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                        sliver:
+                            SliverToBoxAdapter(child: _promoBanner(context)),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                        sliver: SliverToBoxAdapter(
+                          child: Text(
+                            l10n.exploreServices,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                        sliver: SliverGrid.count(
+                          crossAxisCount: 3,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 0.95,
+                          children: [
+                            for (var i = 0; i < filtered.length; i++)
+                              _CategoryTile(
+                                  category: filtered[i], tintIndex: i),
+                          ],
+                        ),
+                      ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 88)),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const Positioned(
+              left: 16,
+              right: 16,
+              bottom: 12,
+              child: _ActiveBookingBar(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _header(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(Icons.place, size: 18, color: scheme.primary),
+        const SizedBox(width: 4),
+        Text(
+          l10n.cityLabel,
+          style: Theme.of(context)
+              .textTheme
+              .labelLarge
+              ?.copyWith(color: scheme.primary, fontWeight: FontWeight.w600),
+        ),
+        const Spacer(),
+        IconButton(
+          icon: const Icon(Icons.settings_outlined),
+          tooltip: l10n.settingsTitle,
+          onPressed: () => context.push('/settings'),
+        ),
+      ],
+    );
+  }
+
+  Widget _searchBar(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    return TextField(
+      onChanged: (v) => setState(() => _query = v),
+      decoration: InputDecoration(
+        hintText: l10n.searchServices,
+        prefixIcon: const Icon(Icons.search),
+        filled: true,
+        fillColor: scheme.surfaceContainerHighest,
+        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _promoBanner(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.promoTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.promoSubtitle,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.white70),
+                ),
+              ],
+            ),
           ),
+          const Icon(Icons.verified_user, color: Colors.white70, size: 36),
         ],
       ),
-      body: categories.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => _Unreachable(
-          onRetry: () => ref.invalidate(categoriesProvider),
-          onSetServerUrl: () => context.push('/settings'),
+    );
+  }
+}
+
+class _CategoryTile extends StatelessWidget {
+  const _CategoryTile({required this.category, required this.tintIndex});
+
+  final Category category;
+  final int tintIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final (bg, fg) = categoryTint(context, tintIndex);
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push(
+          '/category/${category.id}?name=${Uri.encodeComponent(category.name)}',
         ),
-        data: (items) => RefreshIndicator(
-          onRefresh: () async => ref.invalidate(categoriesProvider),
-          child: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                sliver: SliverToBoxAdapter(
-                  child: Text(
-                    l10n.exploreServices,
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: SliverGrid.count(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 1.4,
-                  children: [
-                    for (final category in items)
-                      _CategoryCard(category: category),
-                  ],
-                ),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(categoryIcon(category.icon), size: 30, color: fg),
+              const SizedBox(height: 8),
+              Text(
+                category.name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelMedium
+                    ?.copyWith(color: fg, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -79,43 +271,78 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _CategoryCard extends StatelessWidget {
-  const _CategoryCard({required this.category});
-
-  final Category category;
+/// Zomato-style pinned bar: the customer's current booking, always visible.
+class _ActiveBookingBar extends ConsumerWidget {
+  const _ActiveBookingBar();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    return Card(
-      elevation: 0,
-      color: scheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push(
-          '/category/${category.id}?name=${Uri.encodeComponent(category.name)}',
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(categoryIcon(category.icon),
-                  size: 40, color: scheme.primary),
-              const SizedBox(height: 8),
-              Text(
-                category.name,
-                textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w600),
+    final active = ref.watch(myBookingsProvider('active'));
+    return active.maybeWhen(
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+        final b = items.first;
+        return Material(
+          color: scheme.inverseSurface,
+          borderRadius: BorderRadius.circular(16),
+          elevation: 3,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => ref.read(currentTabProvider.notifier).state = 1,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: statusColor(context, b.status),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          b.serviceName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: scheme.onInverseSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          statusLabel(l10n, b.status),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                scheme.onInverseSurface.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    l10n.viewBooking,
+                    style: const TextStyle(
+                      color: Color(0xFFFBBF24),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
     );
   }
 }
