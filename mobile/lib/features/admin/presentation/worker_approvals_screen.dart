@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -92,6 +94,37 @@ class _ApplicationCard extends ConsumerWidget {
     }
   }
 
+  void _showKyc(BuildContext context, WidgetRef ref, String kind) {
+    final repo = ref.read(workerRepositoryProvider);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: FutureBuilder<Uint8List?>(
+          future: repo.kycImage(application.id, kind),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const SizedBox(
+                height: 200,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            final bytes = snapshot.data;
+            if (bytes == null) {
+              return const SizedBox(
+                height: 120,
+                child: Center(child: Icon(Icons.broken_image, size: 48)),
+              );
+            }
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.memory(bytes, fit: BoxFit.contain),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -120,6 +153,18 @@ class _ApplicationCard extends ConsumerWidget {
             const SizedBox(height: 8),
             Row(
               children: [
+                if (application.hasKycDoc)
+                  TextButton.icon(
+                    icon: const Icon(Icons.badge, size: 18),
+                    label: Text(l10n.viewId),
+                    onPressed: () => _showKyc(context, ref, 'doc'),
+                  ),
+                if (application.hasKycSelfie)
+                  TextButton.icon(
+                    icon: const Icon(Icons.face, size: 18),
+                    label: Text(l10n.viewSelfie),
+                    onPressed: () => _showKyc(context, ref, 'selfie'),
+                  ),
                 const Spacer(),
                 TextButton(
                   onPressed: () => _decide(context, ref, approve: false),

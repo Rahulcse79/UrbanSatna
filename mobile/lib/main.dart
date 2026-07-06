@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/auth/auth_controller.dart';
+import 'core/config/app_config.dart';
+import 'core/config/env.dart';
 import 'core/config/server_url.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode.dart';
+import 'core/widgets/gate_screens.dart';
 import 'l10n/gen/app_localizations.dart';
 
 Future<void> main() async {
@@ -38,6 +41,32 @@ class ServexaApp extends ConsumerWidget {
       routerConfig: router,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      builder: (context, child) =>
+          _AppGate(child: child ?? const SizedBox.shrink()),
     );
+  }
+}
+
+/// Runtime gates from the admin control plane: maintenance mode and
+/// force-update. Admins bypass both (they need the app to turn them off).
+class _AppGate extends ConsumerWidget {
+  const _AppGate({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref
+        .watch(appConfigProvider)
+        .maybeWhen(data: (c) => c, orElse: () => null);
+    final tokens = ref.watch(authControllerProvider);
+    final isAdmin = tokens?.roles
+            .any((r) => r == 'admin' || r == 'super_admin') ??
+        false;
+    if (config != null && !isAdmin) {
+      if (config.minBuild > Env.appBuild) return const ForceUpdateScreen();
+      if (config.maintenanceMode) return const MaintenanceScreen();
+    }
+    return child;
   }
 }

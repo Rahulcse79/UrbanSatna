@@ -8,4 +8,8 @@ abstract final class Env {
   /// change it at runtime in Settings (until the admin locks the flag).
   static const apiBaseUrl =
       _defined != '' ? _defined : 'https://urbansatna.onrender.com';
+
+  /// Monotonic build counter compared against the admin-set `min_build`
+  /// flag (force update). Bump on every release.
+  static const appBuild = int.fromEnvironment('APP_BUILD', defaultValue: 2);
 }

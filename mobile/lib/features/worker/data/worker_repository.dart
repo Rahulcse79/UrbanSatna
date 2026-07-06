@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,6 +15,8 @@ class WorkerApplication {
     this.skills,
     this.experience,
     this.note,
+    this.hasKycDoc = false,
+    this.hasKycSelfie = false,
   });
 
   factory WorkerApplication.fromJson(Map<String, dynamic> json) =>
@@ -25,6 +29,8 @@ class WorkerApplication {
         skills: json['skills'] as String?,
         experience: json['experience'] as String?,
         note: json['note'] as String?,
+        hasKycDoc: json['has_kyc_doc'] as bool? ?? false,
+        hasKycSelfie: json['has_kyc_selfie'] as bool? ?? false,
       );
 
   final String id;
@@ -35,6 +41,8 @@ class WorkerApplication {
   final String? skills;
   final String? experience;
   final String? note;
+  final bool hasKycDoc;
+  final bool hasKycSelfie;
 
   bool get pending => status == 'pending';
   bool get approved => status == 'approved';
@@ -100,4 +108,29 @@ class WorkerRepository {
         'approve': approve,
         if (note != null && note.isNotEmpty) 'note': note,
       });
+
+  /// Attach a KYC photo ("doc" | "selfie") to the pending application.
+  Future<void> uploadKyc(String kind, Uint8List bytes, String mime) =>
+      _dio.post(
+        '/api/v1/me/worker-application/kyc/$kind',
+        data: Stream.fromIterable([bytes]),
+        options: Options(
+          contentType: mime,
+          headers: {Headers.contentLengthHeader: bytes.length},
+        ),
+      );
+
+  /// Admin: fetch a KYC photo for review; null when not uploaded.
+  Future<Uint8List?> kycImage(String applicationId, String kind) async {
+    try {
+      final res = await _dio.get<List<int>>(
+        '/api/v1/admin/worker-applications/$applicationId/kyc/$kind',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final data = res.data;
+      return data == null ? null : Uint8List.fromList(data);
+    } on DioException {
+      return null;
+    }
+  }
 }

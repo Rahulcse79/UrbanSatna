@@ -4,10 +4,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/utils/image_pick.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../worker/data/worker_repository.dart';
 
@@ -163,29 +163,18 @@ class ProfileScreen extends ConsumerWidget {
 class _AvatarPicker extends ConsumerWidget {
   const _AvatarPicker();
 
-  static const _maxBytes = 1000000;
-
   Future<void> _pick(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    final picked = await ImagePicker()
-        .pickImage(source: ImageSource.gallery, imageQuality: 85);
-    if (picked == null) return;
-    final name = picked.name.toLowerCase();
-    final isPng = name.endsWith('.png');
-    final isJpg = name.endsWith('.jpg') || name.endsWith('.jpeg');
-    final bytes = await picked.readAsBytes();
-    if ((!isPng && !isJpg) || bytes.length > _maxBytes) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.avatarInvalid)));
-      return;
-    }
+    final image = await pickValidatedImage(context);
+    if (image == null) return;
     try {
       await ref.read(dioProvider).post(
             '/api/v1/me/avatar',
-            data: Stream.fromIterable([bytes]),
+            data: Stream.fromIterable([image.bytes]),
             options: Options(
-              contentType: isPng ? 'image/png' : 'image/jpeg',
-              headers: {Headers.contentLengthHeader: bytes.length},
+              contentType: image.mime,
+              headers: {Headers.contentLengthHeader: image.bytes.length},
             ),
           );
       ref.invalidate(avatarProvider);
@@ -235,6 +224,46 @@ class _AvatarPicker extends ConsumerWidget {
   }
 }
 
+/// KYC photo upload for a pending worker application.
+class _KycButton extends ConsumerWidget {
+  const _KycButton({
+    required this.done,
+    required this.label,
+    required this.kind,
+  });
+
+  final bool done;
+  final String label;
+  final String kind;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return OutlinedButton.icon(
+      icon: Icon(
+        done ? Icons.check_circle : Icons.upload_file,
+        size: 18,
+        color: done ? Colors.green : null,
+      ),
+      label: Text(label, overflow: TextOverflow.ellipsis),
+      onPressed: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        final image = await pickValidatedImage(context);
+        if (image == null) return;
+        try {
+          await ref
+              .read(workerRepositoryProvider)
+              .uploadKyc(kind, image.bytes, image.mime);
+          ref.invalidate(myWorkerApplicationProvider);
+          messenger.showSnackBar(SnackBar(content: Text(l10n.kycUploaded)));
+        } catch (e) {
+          messenger.showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
+        }
+      },
+    );
+  }
+}
+
 /// Worker onboarding tile with the verification lifecycle:
 /// never applied → apply · pending → under review · rejected → re-apply ·
 /// approved → activate (token refresh picks up the role).
@@ -263,11 +292,38 @@ class _WorkerApplicationTile extends ConsumerWidget {
           );
         }
         if (app.pending) {
-          return ListTile(
-            leading: const Icon(Icons.hourglass_top),
-            title: Text(l10n.applicationPending),
-            subtitle: Text(l10n.applicationPendingHint),
-            onTap: () => ref.invalidate(myWorkerApplicationProvider),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.hourglass_top),
+                title: Text(l10n.applicationPending),
+                subtitle: Text(l10n.applicationPendingHint),
+                onTap: () => ref.invalidate(myWorkerApplicationProvider),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _KycButton(
+                        done: app.hasKycDoc,
+                        label: l10n.uploadId,
+                        kind: 'doc',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _KycButton(
+                        done: app.hasKycSelfie,
+                        label: l10n.uploadSelfie,
+                        kind: 'selfie',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           );
         }
         if (app.rejected) {

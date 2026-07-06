@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../bookings/data/bookings_repository.dart';
 import '../../bookings/presentation/bookings_screen.dart'
@@ -190,8 +191,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  /// Admin-controlled banner: text comes from app-config, with the
+  /// built-in copy as fallback; hidden when the admin disables it.
   Widget _promoBanner(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final config = ref
+        .watch(appConfigProvider)
+        .maybeWhen(data: (c) => c, orElse: () => null);
+    if (config != null && !config.promoEnabled) {
+      return const SizedBox.shrink();
+    }
+    final title = config?.promoTitle ?? l10n.promoTitle;
+    final subtitle = config?.promoSubtitle ?? l10n.promoSubtitle;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -207,13 +218,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  l10n.promoTitle,
+                  title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Colors.white, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  l10n.promoSubtitle,
+                  subtitle,
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
