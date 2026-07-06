@@ -30,16 +30,23 @@ pub async fn apply(
     skills: Option<&str>,
     experience: Option<&str>,
 ) -> Result<WorkerApplication, AppError> {
-    let already_worker: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
-          WHERE ur.user_id = $1 AND r.name = 'worker')",
+    let roles: Vec<String> = sqlx::query_scalar(
+        "SELECT r.name FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+          WHERE ur.user_id = $1",
     )
     .bind(user_id)
-    .fetch_one(pg)
+    .fetch_all(pg)
     .await?;
-    if already_worker {
+    if roles.iter().any(|r| r == "worker") {
         return Err(AppError::Conflict(
             "you are already a verified worker".into(),
+        ));
+    }
+    // Separation of duties: staff accounts operate the platform, they
+    // don't participate in the marketplace (PRODUCT.md role matrix).
+    if roles.iter().any(|r| r == "admin" || r == "super_admin") {
+        return Err(AppError::Conflict(
+            "admin accounts cannot become workers".into(),
         ));
     }
     let id = Uuid::now_v7();

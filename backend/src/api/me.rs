@@ -1,4 +1,7 @@
+use axum::body::Bytes;
 use axum::extract::State;
+use axum::http::{header, HeaderMap, StatusCode};
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
@@ -7,6 +10,8 @@ use crate::domain::error::AppError;
 use crate::infra::db::{audit, users, workers};
 use crate::middleware::auth::CurrentUser;
 use crate::state::AppState;
+
+const MAX_AVATAR_BYTES: usize = 1_000_000; // product rule: ≤ 1 MB
 
 #[derive(Serialize)]
 pub struct Me {
@@ -103,4 +108,72 @@ pub async fn my_worker_application(
     Ok(Json(ApiResponse::ok(
         workers::latest_for_user(&state.pg, current.id).await?,
     )))
+}
+
+/// PNG/JPEG only, ≤ 1 MB; the magic bytes are checked, not just the header.
+pub async fn upload_avatar(
+    State(state): State<AppState>,
+    current: CurrentUser,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    if body.len() > MAX_AVATAR_BYTES {
+        return Err(AppError::Validation("image must be under 1 MB".into()));
+    }
+    let is_png = body.starts_with(&[0x89, b'P', b'N', b'G']);
+    let is_jpeg = body.starts_with(&[0xFF, 0xD8, 0xFF]);
+    let mime = if is_png {
+        "image/png"
+    } else if is_jpeg {
+        "image/jpeg"
+    } else {
+        return Err(AppError::Validation(
+            "only PNG or JPG images allowed".into(),
+        ));
+    };
+    // The declared content-type must not contradict the actual bytes.
+    if let Some(declared) = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+    {
+        if !declared.starts_with("image/") {
+            return Err(AppError::Validation("content-type must be an image".into()));
+        }
+    }
+    sqlx::query("UPDATE users SET avatar = $2, avatar_mime = $3 WHERE id = $1")
+        .bind(current.id)
+        .bind(body.as_ref())
+        .bind(mime)
+        .execute(&state.pg)
+        .await?;
+    audit::log(
+        &state.pg,
+        Some(current.id),
+        "customer",
+        "user.avatar_updated",
+        "user",
+        Some(current.id),
+        None,
+    )
+    .await?;
+    Ok(Json(ApiResponse::ok(
+        serde_json::json!({ "updated": true }),
+    )))
+}
+
+pub async fn get_avatar(
+    State(state): State<AppState>,
+    current: CurrentUser,
+) -> Result<Response, AppError> {
+    let row: Option<(Option<Vec<u8>>, Option<String>)> =
+        sqlx::query_as("SELECT avatar, avatar_mime FROM users WHERE id = $1")
+            .bind(current.id)
+            .fetch_optional(&state.pg)
+            .await?;
+    match row {
+        Some((Some(bytes), Some(mime))) => {
+            Ok(([(header::CONTENT_TYPE, mime)], bytes).into_response())
+        }
+        _ => Ok(StatusCode::NOT_FOUND.into_response()),
+    }
 }

@@ -41,6 +41,7 @@ pub fn router(state: AppState) -> Router {
             "/me/worker-application",
             get(me::my_worker_application).post(me::apply_worker),
         )
+        .route("/me/avatar", get(me::get_avatar).post(me::upload_avatar))
         // legacy alias: old APKs now create an application, not a role
         .route("/me/become-worker", post(me::apply_worker))
         // admin: worker verification queue

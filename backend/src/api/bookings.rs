@@ -69,9 +69,11 @@ pub async fn available_jobs(
     current: CurrentUser,
 ) -> Result<Json<ApiResponse<Vec<bookings::Booking>>>, AppError> {
     current.require_role("worker")?;
-    Ok(Json(ApiResponse::ok(bookings::redact_all_for_worker(
-        bookings::available(&state.pg, current.id).await?,
-    ))))
+    let jobs = bookings::redact_all_for_worker(bookings::available(&state.pg, current.id).await?)
+        .into_iter()
+        .map(bookings::Booking::redact_contact)
+        .collect::<Vec<_>>();
+    Ok(Json(ApiResponse::ok(jobs)))
 }
 
 pub async fn my_jobs(

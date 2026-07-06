@@ -16,8 +16,14 @@ pub struct Booking {
     pub category_name: String,
     pub customer_id: Uuid,
     pub customer_name: Option<String>,
+    /// Shared with the assigned worker so they can call; hidden on the
+    /// open job feed (contact exchange happens only after accept).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub customer_phone: Option<String>,
     pub worker_id: Option<Uuid>,
     pub worker_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worker_phone: Option<String>,
     pub address: String,
     pub note: Option<String>,
     pub price_paise: i64,
@@ -35,6 +41,12 @@ impl Booking {
         self.arrival_otp = None;
         self
     }
+
+    /// For the open job feed: no customer contact before accept.
+    pub fn redact_contact(mut self) -> Self {
+        self.customer_phone = None;
+        self
+    }
 }
 
 pub fn redact_all_for_worker(list: Vec<Booking>) -> Vec<Booking> {
@@ -43,7 +55,8 @@ pub fn redact_all_for_worker(list: Vec<Booking>) -> Vec<Booking> {
 
 const SELECT: &str = "SELECT b.id, b.status, b.service_id, s.name AS service_name,
        c.name AS category_name, b.customer_id, cu.full_name AS customer_name,
-       b.worker_id, w.full_name AS worker_name, b.address, b.note,
+       cu.phone AS customer_phone, b.worker_id, w.full_name AS worker_name,
+       w.phone AS worker_phone, b.address, b.note,
        b.price_paise, b.rating, b.review, b.arrival_otp, b.created_at
   FROM bookings b
   JOIN services s ON s.id = b.service_id
