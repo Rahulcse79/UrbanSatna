@@ -15,12 +15,17 @@ pub struct WorkerApplication {
     pub skills: Option<String>,
     pub experience: Option<String>,
     pub note: Option<String>,
+    pub has_kyc_doc: bool,
+    pub has_kyc_selfie: bool,
     pub created_at: DateTime<Utc>,
     pub decided_at: Option<DateTime<Utc>>,
 }
 
 const SELECT: &str = "SELECT a.id, a.user_id, u.phone, u.full_name, a.status,
-       a.skills, a.experience, a.note, a.created_at, a.decided_at
+       a.skills, a.experience, a.note,
+       (a.kyc_doc IS NOT NULL) AS has_kyc_doc,
+       (a.kyc_selfie IS NOT NULL) AS has_kyc_selfie,
+       a.created_at, a.decided_at
   FROM worker_applications a
   JOIN users u ON u.id = a.user_id";
 
@@ -97,6 +102,59 @@ pub async fn list(pg: &PgPool, status: &str) -> Result<Vec<WorkerApplication>, A
     .bind(status)
     .fetch_all(pg)
     .await?)
+}
+
+/// Attaches a KYC photo to the user's pending application.
+/// `kind` is validated at the API boundary ("doc" | "selfie").
+pub async fn set_kyc(
+    pg: &PgPool,
+    user_id: Uuid,
+    kind: &str,
+    bytes: &[u8],
+    mime: &str,
+) -> Result<(), AppError> {
+    let sql = match kind {
+        "doc" => {
+            "UPDATE worker_applications SET kyc_doc = $2, kyc_doc_mime = $3
+             WHERE user_id = $1 AND status = 'pending'"
+        }
+        "selfie" => {
+            "UPDATE worker_applications SET kyc_selfie = $2, kyc_selfie_mime = $3
+             WHERE user_id = $1 AND status = 'pending'"
+        }
+        _ => return Err(AppError::Validation("unknown document kind".into())),
+    };
+    let updated = sqlx::query(sql)
+        .bind(user_id)
+        .bind(bytes)
+        .bind(mime)
+        .execute(pg)
+        .await?;
+    if updated.rows_affected() == 0 {
+        return Err(AppError::Conflict(
+            "no pending application to attach documents to".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// KYC photo bytes for the admin review screen.
+pub async fn kyc_image(
+    pg: &PgPool,
+    id: Uuid,
+    kind: &str,
+) -> Result<Option<(Vec<u8>, String)>, AppError> {
+    let sql = match kind {
+        "doc" => "SELECT kyc_doc, kyc_doc_mime FROM worker_applications WHERE id = $1",
+        "selfie" => "SELECT kyc_selfie, kyc_selfie_mime FROM worker_applications WHERE id = $1",
+        _ => return Err(AppError::Validation("unknown document kind".into())),
+    };
+    let row: Option<(Option<Vec<u8>>, Option<String>)> =
+        sqlx::query_as(sql).bind(id).fetch_optional(pg).await?;
+    Ok(match row {
+        Some((Some(bytes), Some(mime))) => Some((bytes, mime)),
+        _ => None,
+    })
 }
 
 /// Approve/reject in one transaction: approval also grants the worker role,

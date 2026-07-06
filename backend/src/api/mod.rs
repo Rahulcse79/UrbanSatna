@@ -42,6 +42,7 @@ pub fn router(state: AppState) -> Router {
             get(me::my_worker_application).post(me::apply_worker),
         )
         .route("/me/avatar", get(me::get_avatar).post(me::upload_avatar))
+        .route("/me/worker-application/kyc/{kind}", post(me::upload_kyc))
         // legacy alias: old APKs now create an application, not a role
         .route("/me/become-worker", post(me::apply_worker))
         // admin: worker verification queue
@@ -53,13 +54,28 @@ pub fn router(state: AppState) -> Router {
             "/admin/worker-applications/{id}/decide",
             post(admin::decide_worker_application),
         )
+        .route(
+            "/admin/worker-applications/{id}/kyc/{kind}",
+            get(admin::kyc_image),
+        )
+        // admin: catalog management (includes inactive rows)
+        .route(
+            "/admin/catalog/categories",
+            get(catalog::list_categories_admin),
+        )
+        .route(
+            "/admin/catalog/categories/{id}/services",
+            get(catalog::list_services_admin),
+        )
         // catalog (public reads, admin writes)
         .route(
             "/categories",
             get(catalog::list_categories).post(catalog::create_category),
         )
+        .route("/categories/{id}", patch(catalog::update_category))
         .route("/categories/{id}/services", get(catalog::list_services))
         .route("/services", post(catalog::create_service))
+        .route("/services/{id}", patch(catalog::update_service))
         // customer bookings
         .route("/bookings", post(bookings::create))
         .route("/bookings/mine", get(bookings::mine))

@@ -111,20 +111,13 @@ pub async fn my_worker_application(
 }
 
 /// PNG/JPEG only, ≤ 1 MB; the magic bytes are checked, not just the header.
-pub async fn upload_avatar(
-    State(state): State<AppState>,
-    current: CurrentUser,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+pub fn validate_image(body: &Bytes, headers: &HeaderMap) -> Result<&'static str, AppError> {
     if body.len() > MAX_AVATAR_BYTES {
         return Err(AppError::Validation("image must be under 1 MB".into()));
     }
-    let is_png = body.starts_with(&[0x89, b'P', b'N', b'G']);
-    let is_jpeg = body.starts_with(&[0xFF, 0xD8, 0xFF]);
-    let mime = if is_png {
+    let mime = if body.starts_with(&[0x89, b'P', b'N', b'G']) {
         "image/png"
-    } else if is_jpeg {
+    } else if body.starts_with(&[0xFF, 0xD8, 0xFF]) {
         "image/jpeg"
     } else {
         return Err(AppError::Validation(
@@ -140,6 +133,16 @@ pub async fn upload_avatar(
             return Err(AppError::Validation("content-type must be an image".into()));
         }
     }
+    Ok(mime)
+}
+
+pub async fn upload_avatar(
+    State(state): State<AppState>,
+    current: CurrentUser,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    let mime = validate_image(&body, &headers)?;
     sqlx::query("UPDATE users SET avatar = $2, avatar_mime = $3 WHERE id = $1")
         .bind(current.id)
         .bind(body.as_ref())
@@ -158,6 +161,34 @@ pub async fn upload_avatar(
     .await?;
     Ok(Json(ApiResponse::ok(
         serde_json::json!({ "updated": true }),
+    )))
+}
+
+/// KYC photo ("doc" or "selfie") for the caller's pending application.
+pub async fn upload_kyc(
+    State(state): State<AppState>,
+    current: CurrentUser,
+    axum::extract::Path(kind): axum::extract::Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    if kind != "doc" && kind != "selfie" {
+        return Err(AppError::Validation("kind must be doc or selfie".into()));
+    }
+    let mime = validate_image(&body, &headers)?;
+    workers::set_kyc(&state.pg, current.id, &kind, &body, mime).await?;
+    audit::log(
+        &state.pg,
+        Some(current.id),
+        "customer",
+        "worker.kyc_uploaded",
+        "worker_application",
+        None,
+        Some(serde_json::json!({ "kind": kind })),
+    )
+    .await?;
+    Ok(Json(ApiResponse::ok(
+        serde_json::json!({ "uploaded": true }),
     )))
 }
 

@@ -27,6 +27,28 @@ pub async fn list_services(
     )))
 }
 
+/// Admin view: also returns deactivated rows so they can be re-enabled.
+pub async fn list_categories_admin(
+    State(state): State<AppState>,
+    current: CurrentUser,
+) -> Result<Json<ApiResponse<Vec<catalog::Category>>>, AppError> {
+    current.require_perm("catalog:manage")?;
+    Ok(Json(ApiResponse::ok(
+        catalog::list_categories_all(&state.pg).await?,
+    )))
+}
+
+pub async fn list_services_admin(
+    State(state): State<AppState>,
+    current: CurrentUser,
+    Path(category_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Vec<catalog::Service>>>, AppError> {
+    current.require_perm("catalog:manage")?;
+    Ok(Json(ApiResponse::ok(
+        catalog::list_services_all(&state.pg, category_id).await?,
+    )))
+}
+
 #[derive(Deserialize)]
 pub struct NewCategory {
     pub name: String,
@@ -107,6 +129,88 @@ pub async fn create_service(
         "service",
         Some(service.id),
         Some(json!({ "name": service.name, "price_paise": service.base_price_paise })),
+    )
+    .await?;
+    Ok(Json(ApiResponse::ok(service)))
+}
+
+#[derive(Deserialize)]
+pub struct UpdateCategory {
+    pub name: Option<String>,
+    pub icon: Option<String>,
+    pub sort_order: Option<i32>,
+    pub is_active: Option<bool>,
+}
+
+pub async fn update_category(
+    State(state): State<AppState>,
+    current: CurrentUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<UpdateCategory>,
+) -> Result<Json<ApiResponse<catalog::Category>>, AppError> {
+    current.require_perm("catalog:manage")?;
+    let category = catalog::update_category(
+        &state.pg,
+        id,
+        body.name.as_deref(),
+        body.icon.as_deref(),
+        body.sort_order,
+        body.is_active,
+    )
+    .await?;
+    audit::log(
+        &state.pg,
+        Some(current.id),
+        "admin",
+        "category.updated",
+        "category",
+        Some(id),
+        Some(json!({ "is_active": category.is_active, "name": category.name })),
+    )
+    .await?;
+    Ok(Json(ApiResponse::ok(category)))
+}
+
+#[derive(Deserialize)]
+pub struct UpdateService {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub base_price_paise: Option<i64>,
+    pub duration_min: Option<i32>,
+    pub is_active: Option<bool>,
+}
+
+pub async fn update_service(
+    State(state): State<AppState>,
+    current: CurrentUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<UpdateService>,
+) -> Result<Json<ApiResponse<catalog::Service>>, AppError> {
+    current.require_perm("catalog:manage")?;
+    if body.base_price_paise.is_some_and(|p| p <= 0) {
+        return Err(AppError::Validation("base_price_paise must be > 0".into()));
+    }
+    let service = catalog::update_service(
+        &state.pg,
+        id,
+        body.name.as_deref(),
+        body.description.as_deref(),
+        body.base_price_paise,
+        body.duration_min,
+        body.is_active,
+    )
+    .await?;
+    audit::log(
+        &state.pg,
+        Some(current.id),
+        "admin",
+        "service.updated",
+        "service",
+        Some(id),
+        Some(json!({
+            "is_active": service.is_active,
+            "price_paise": service.base_price_paise
+        })),
     )
     .await?;
     Ok(Json(ApiResponse::ok(service)))

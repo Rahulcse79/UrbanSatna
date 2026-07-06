@@ -10,10 +10,21 @@ use crate::middleware::auth::CurrentUser;
 use crate::state::AppState;
 
 const ALLOW_SERVER_URL_CHANGE: &str = "allow_server_url_change";
+const PROMO_BANNER: &str = "promo_banner";
+const MAINTENANCE_MODE: &str = "maintenance_mode";
+const MIN_BUILD: &str = "min_build";
 
+/// Runtime app configuration — the control plane the admin edits live
+/// (PRODUCT.md §6.5). Every field has a safe default so a missing row
+/// or an old server never breaks the app.
 #[derive(Debug, Serialize)]
 pub struct AppConfig {
     pub allow_server_url_change: bool,
+    pub promo_enabled: bool,
+    pub promo_title: Option<String>,
+    pub promo_subtitle: Option<String>,
+    pub maintenance_mode: bool,
+    pub min_build: i64,
 }
 
 async fn load(state: &AppState) -> Result<AppConfig, AppError> {
@@ -21,8 +32,34 @@ async fn load(state: &AppState) -> Result<AppConfig, AppError> {
         .await?
         .and_then(|v| v.as_bool())
         .unwrap_or(true); // default: users may change the server URL
+    let promo = settings::get_json(&state.pg, PROMO_BANNER).await?;
+    let maintenance = settings::get_json(&state.pg, MAINTENANCE_MODE)
+        .await?
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let min_build = settings::get_json(&state.pg, MIN_BUILD)
+        .await?
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     Ok(AppConfig {
         allow_server_url_change: allow,
+        promo_enabled: promo
+            .as_ref()
+            .and_then(|p| p.get("enabled"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
+        promo_title: promo
+            .as_ref()
+            .and_then(|p| p.get("title"))
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        promo_subtitle: promo
+            .as_ref()
+            .and_then(|p| p.get("subtitle"))
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        maintenance_mode: maintenance,
+        min_build,
     })
 }
 
@@ -35,6 +72,11 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<ApiResponse<AppCo
 #[derive(Deserialize)]
 pub struct UpdateAppConfig {
     pub allow_server_url_change: Option<bool>,
+    pub promo_enabled: Option<bool>,
+    pub promo_title: Option<String>,
+    pub promo_subtitle: Option<String>,
+    pub maintenance_mode: Option<bool>,
+    pub min_build: Option<i64>,
 }
 
 /// Admin: toggle app behavior at runtime (perm settings:manage).
@@ -44,8 +86,36 @@ pub async fn update(
     Json(body): Json<UpdateAppConfig>,
 ) -> Result<Json<ApiResponse<AppConfig>>, AppError> {
     current.require_perm("settings:manage")?;
+    let mut changed = serde_json::Map::new();
+
     if let Some(allow) = body.allow_server_url_change {
         settings::set_json(&state.pg, ALLOW_SERVER_URL_CHANGE, json!(allow)).await?;
+        changed.insert(ALLOW_SERVER_URL_CHANGE.into(), json!(allow));
+    }
+    if body.promo_enabled.is_some() || body.promo_title.is_some() || body.promo_subtitle.is_some() {
+        // Merge over the current banner so a partial edit keeps the rest.
+        let current_banner = load(&state).await?;
+        let banner = json!({
+            "enabled": body.promo_enabled.unwrap_or(current_banner.promo_enabled),
+            "title": body.promo_title.or(current_banner.promo_title),
+            "subtitle": body.promo_subtitle.or(current_banner.promo_subtitle),
+        });
+        settings::set_json(&state.pg, PROMO_BANNER, banner.clone()).await?;
+        changed.insert(PROMO_BANNER.into(), banner);
+    }
+    if let Some(maintenance) = body.maintenance_mode {
+        settings::set_json(&state.pg, MAINTENANCE_MODE, json!(maintenance)).await?;
+        changed.insert(MAINTENANCE_MODE.into(), json!(maintenance));
+    }
+    if let Some(min_build) = body.min_build {
+        if min_build < 0 {
+            return Err(AppError::Validation("min_build must be >= 0".into()));
+        }
+        settings::set_json(&state.pg, MIN_BUILD, json!(min_build)).await?;
+        changed.insert(MIN_BUILD.into(), json!(min_build));
+    }
+
+    if !changed.is_empty() {
         audit::log(
             &state.pg,
             Some(current.id),
@@ -53,7 +123,7 @@ pub async fn update(
             "settings.updated",
             "app_setting",
             None,
-            Some(json!({ "key": ALLOW_SERVER_URL_CHANGE, "value": allow })),
+            Some(serde_json::Value::Object(changed)),
         )
         .await?;
     }
