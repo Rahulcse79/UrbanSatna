@@ -24,6 +24,9 @@
 
 ## Phase 0 — Foundations (Week 1–2)
 
+> **Status: ✅ complete** (compose + native fallback, health/metrics,
+> envelope, migrations, CI, mobile scaffold, OpenAPI seeded).
+
 Skeleton that everything else hangs on.
 
 - [ ] Repo layout per CLAUDE.md §4; `backend/`, `mobile/`, `infra/`, `docs/`
@@ -42,6 +45,10 @@ Flutter app boots and reads `/health`; CI is green.
 
 ## Phase 1 — Identity & RBAC (Week 2–4)
 
+> **Status: ✅ complete** — OTP login (dev echo until SMS lands), JWT +
+> rotating refresh, permission-based RBAC, profile + avatar. Addresses
+> with lat/lng move to the maps work in Phase 2–3.
+
 - [ ] OTP login (phone) with Redis-backed OTP (hashed, TTL, attempt limit)
 - [ ] JWT access + rotating refresh tokens; device sessions; logout-all
 - [ ] RBAC middleware (permission-based); seed roles: customer, worker,
@@ -53,6 +60,10 @@ Flutter app boots and reads `/health`; CI is green.
 RBAC blocks a customer from an admin route (integration-tested).
 
 ## Phase 2 — Catalog & Worker Onboarding (Week 4–6)
+
+> **Status: 🔨 partial** — data-driven catalog with in-app admin CRUD ✅,
+> worker application + KYC photos + admin verify queue ✅ (images in PG
+> for now, S3 later). Pending: geo search, service radius, availability.
 
 - [ ] `categories` / `subcategories` / `services` — fully data-driven,
       admin CRUD endpoints, image upload to S3/MinIO
@@ -67,6 +78,11 @@ RBAC blocks a customer from an admin route (integration-tested).
 the app with zero code changes; nearby search returns correct workers p95 < 300 ms.
 
 ## Phase 3 — Booking Engine (Week 6–9) — the core
+
+> **Status: 🔨 partial** — state machine with `arrived` + arrival-OTP
+> handshake ✅, atomic first-accept-wins ✅, contact exchange after
+> accept ✅, cancel rules ✅. Pending: FCM fan-out with timeout/re-offer,
+> live tracking (Maps key), background job worker.
 
 - [ ] Booking state machine in `domain` (see CLAUDE.md §6), transactional
       transitions, every transition audited

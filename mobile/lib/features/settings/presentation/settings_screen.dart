@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/config/env.dart';
 import '../../../core/config/server_url.dart';
 import '../../../core/theme/theme_mode.dart';
 import '../../../l10n/gen/app_localizations.dart';
@@ -123,6 +124,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 24),
+          Center(
+            child: Text(
+              'Servexa · build ${Env.appBuild}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+            ),
+          ),
         ],
       ),
     );

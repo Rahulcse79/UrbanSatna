@@ -61,7 +61,12 @@ jobs:
           fi
           # Launcher shows the brand name, not the package name.
           sed -i 's#android:label="servexa"#android:label="Servexa"#' "$MANIFEST"
-          grep -E 'INTERNET|usesCleartextTraffic|android:label' "$MANIFEST"
+          # Android 11+ package visibility: without <queries>, url_launcher
+          # cannot resolve tel: (call buttons) or https: (Maps navigate).
+          if ! grep -q '<queries>' "$MANIFEST"; then
+            sed -i 's#</manifest>#    <queries>\n        <intent><action android:name="android.intent.action.DIAL" /></intent>\n        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="https" /></intent>\n    </queries>\n</manifest>#' "$MANIFEST"
+          fi
+          grep -E 'INTERNET|usesCleartextTraffic|android:label|queries' "$MANIFEST"
 
       - name: Dependencies
         run: flutter pub get
@@ -69,12 +74,15 @@ jobs:
       - name: Generate localizations
         run: flutter gen-l10n
 
+      # APP_BUILD = CI run number: monotonic, shown in Settings, compared
+      # against the admin-set min_build flag for force updates.
       - name: Build APK
         env:
           API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL }}
         run: >
           flutter build apk --release
           --dart-define=API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8080}"
+          --dart-define=APP_BUILD=${{ github.run_number }}
 
       - name: Build AppBundle (Play Store)
         env:
@@ -82,6 +90,7 @@ jobs:
         run: >
           flutter build appbundle --release
           --dart-define=API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8080}"
+          --dart-define=APP_BUILD=${{ github.run_number }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -131,6 +140,7 @@ jobs:
         run: >
           flutter build ios --release --no-codesign
           --dart-define=API_BASE_URL="${API_BASE_URL:-http://10.0.2.2:8080}"
+          --dart-define=APP_BUILD=${{ github.run_number }}
 
       # Unsigned ipa: installable via AltStore/Sideloadly or re-signable
       # later; proper TestFlight distribution needs Apple signing secrets.

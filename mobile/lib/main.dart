@@ -65,7 +65,11 @@ class _AppGate extends ConsumerWidget {
         false;
     if (config != null && !isAdmin) {
       if (config.minBuild > Env.appBuild) return const ForceUpdateScreen();
-      if (config.maintenanceMode) return const MaintenanceScreen();
+      // Maintenance never blocks the login screen (tokens == null):
+      // otherwise a logged-out admin could not sign in to turn it off.
+      if (config.maintenanceMode && tokens != null) {
+        return const MaintenanceScreen();
+      }
     }
     return child;
   }

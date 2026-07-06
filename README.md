@@ -1,9 +1,10 @@
-# UrbanSatna
+# UrbanSatna · Servexa
 
-Hyperlocal service marketplace for India — customers book verified nearby
-professionals (electrician, plumber, AC technician, cleaning, …). Launch
-city: **Satna, Madhya Pradesh**. Service categories are data managed by
-admins at runtime, never code.
+Hyperlocal service marketplace for India — "Uber for home services".
+Customers book verified nearby professionals (electrician, plumber, AC
+technician, cleaning, …) with upfront prices, live status, and an arrival-OTP
+trust handshake. Launch city: **Satna, Madhya Pradesh**. Service categories
+are data managed by admins at runtime, never code.
 
 The mobile app ships under the brand name **Servexa** (app ID
 `com.servexa`, Dart package `servexa`).
@@ -14,10 +15,32 @@ The mobile app ships under the brand name **Servexa** (app ID
 | Mobile     | Flutter · Riverpod · GoRouter · Dio          | `mobile/`  |
 | Contract   | OpenAPI 3.1 (source of truth)                | `api/`     |
 | Dev infra  | Docker Compose (PG, Redis, MinIO)            | `infra/`   |
+| Deploy     | Render blueprint (auto-deploy on push)       | `render.yaml` |
 
 Read first: [CLAUDE.md](CLAUDE.md) (architecture rules) ·
-[docs/PLAN.md](docs/PLAN.md) (roadmap) ·
-[docs/MASTER_PROMPT.md](docs/MASTER_PROMPT.md) (AI session contract).
+[docs/PRODUCT.md](docs/PRODUCT.md) (vision, features, roadmap) ·
+[docs/PLAN.md](docs/PLAN.md) (engineering phases).
+
+## What works today
+
+**Customer** — OTP login · category grid → fixed-price booking · live status
+timeline (accepted → on the way → arrived → working → done) · arrival OTP to
+share at the door · call the assigned worker · rate 1–5★ · profile photo ·
+light/dark/system theme · English + Hindi.
+
+**Worker** — apply with skills + KYC photos (ID + selfie) · admin-verified
+before the first job · online job feed, first-accept-wins · call customer +
+one-tap Google Maps navigation after accept · OTP-gated job start · earnings.
+
+**Admin (in-app panel)** — worker verification queue with KYC viewer ·
+catalog manager (add/toggle categories & services live) · promo banner
+editor · maintenance mode · min-build force update · server-URL kill switch.
+Admins cannot be workers (separation of duties), and prices are admin-only —
+workers will get a request-queue, never direct edits.
+
+**Platform** — permission-based RBAC · every mutation audited · rotating
+refresh tokens · atomic first-accept · contact privacy until accept ·
+customer-only OTP redaction · Render auto-deploy.
 
 ## Quickstart
 
@@ -52,6 +75,23 @@ createdb urbansatna
 redis-server --daemonize yes
 ```
 
+## Deployment
+
+Pushing to `main` auto-deploys the API to Render (`render.yaml` wires the
+web service + Postgres + Redis). Production: `https://urbansatna.onrender.com`
+(`/health` shows DB/Redis status).
+
+APK/IPA builds: GitHub Actions → **Mobile Release Builds** → *Run workflow*
+with `api_base_url` (defaults are baked toward the Render URL). Each build
+gets `APP_BUILD` = the CI run number — shown in the app's Settings footer and
+compared against the admin `min_build` flag for force updates.
+
+**Free-tier reality (before real users):** Render free services sleep
+(~50 s cold start) and free Postgres expires after ~90 days with no backups;
+`DEV_RETURN_OTP=true` returns the login OTP in the API response because no
+SMS gateway is wired yet. Both are launch gates — see
+[docs/PRODUCT.md §12](docs/PRODUCT.md).
+
 ## Verifying
 
 ```bash
@@ -68,11 +108,12 @@ CI (GitHub Actions) runs the same on every push/PR.
 ```
 backend/src/
   api/          Axum routers + DTOs (envelope: success/data/error/meta)
-  application/  use cases (from Phase 1)
-  domain/       entities, errors — pure, no I/O
-  infra/        Postgres, Redis, storage, vendors (behind traits)
+  domain/       entities, state machine, errors — pure, no I/O
+  infra/        Postgres repos, Redis, OTP, JWT (vendors behind traits)
+  middleware/   auth extractor, RBAC helpers
 backend/migrations/   forward-only SQL, embedded & applied at startup
 mobile/lib/
-  core/         config, theme, router, network
-  features/<f>/ presentation · application · domain · data
+  core/         config, theme, router, network, shared utils
+  features/<f>/ presentation · data · domain (auth, home, catalog,
+                bookings, jobs, worker, profile, admin, settings, shell)
 ```

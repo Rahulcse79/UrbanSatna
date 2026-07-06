@@ -79,6 +79,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   onRefresh: () async {
                     ref.invalidate(categoriesProvider);
                     ref.invalidate(myBookingsProvider('active'));
+                    // picks up admin changes (promo banner, flags) live
+                    ref.invalidate(appConfigProvider);
                   },
                   child: CustomScrollView(
                     slivers: [

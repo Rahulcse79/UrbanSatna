@@ -108,12 +108,13 @@ friction — Android-first, iOS parity later.
 - ✅ Category grid → service list → book (data-driven catalog)
 - ✅ Bookings: active/past, status chips, cancel, rate 1–5★
 - ✅ Server URL setting (admin-lockable)
-- 🔜 UI v2 (design system below), promo banner, popular services, active-booking pinned card
+- ✅ UI v2 (design system below): promo banner (admin-driven), tinted grid, pinned active-booking bar
+- ✅ Arrival OTP display + 5-step status timeline
+- ✅ Call the assigned worker · profile photo (PNG/JPG ≤ 1 MB) · light/dark/system theme
 - 🔜 Address book with map-pin picker + GPS autodetect
-- 🔜 Live tracking screen (map, route, ETA, call)
-- 🔜 Arrival OTP display
+- 🔜 Live tracking screen (map, route, ETA) — needs Maps API key
 - 🔜 Problem photos on booking
-- 🔜 Push notifications (FCM): offer accepted, en-route, arrived, completed
+- 🔜 Push notifications (FCM): offer accepted, en-route, arrived, completed — needs Firebase project
 - 📋 UPI/Razorpay payment, invoices (PDF), coupons/referral codes
 - 📋 In-app chat with worker · scheduled ("book for tomorrow 10am") bookings
 - 📋 Wallet · subscriptions (AMC plans: 2 AC services/year) · service packages
@@ -121,11 +122,13 @@ friction — Android-first, iOS parity later.
 
 ### Worker app (same binary, worker mode)
 - ✅ Become-a-worker, online toggle, job feed, accept (first-wins), status advance, earnings card
-- 🔜 KYC upload + verification states (pending/approved/rejected) — **accept
-  gate: only admin-verified workers receive offers or can accept.** Today
-  `become_worker` is a self-service toggle (test phase); it must not survive M2.
+- ✅ KYC upload (ID + selfie) + verification states — **accept gate live:
+  the worker role is granted only by admin approval; the self-service
+  toggle is gone. Admin accounts cannot apply (separation of duties).**
+- ✅ Call customer + Google Maps navigate (address deep link) after accept;
+  contact hidden until accept
 - 🔜 Job offer full-screen card with 60-s countdown + sound (like Rapido)
-- 🔜 Navigate button + background location pings while en-route
+- 🔜 Background location pings while en-route (foreground service)
 - 🔜 Skill & radius selection, weekly availability schedule
 - 🔜 **Price-change request**: propose a new price for a service with reason;
   track its status (pending/approved/rejected) — admin decides, never the worker
@@ -134,12 +137,16 @@ friction — Android-first, iOS parity later.
 ### Admin — runtime control plane (see §6.5)
 - ✅ RBAC (permission-based), `ADMIN_PHONES` bootstrap, app-config flags (server-URL lock)
 - ✅ Audit log on every mutation
-- 🔜 Category/service CRUD from app (currently DB-seeded)
-- 🔜 **Pricing control**: service prices, visiting charge, commission % — live edits, audited
-- 🔜 **Offers & coupons**: promo banners with schedule, coupon engine
+- ✅ Category/service CRUD from the in-app admin panel — add or switch off
+  categories/services live; every user sees it instantly
+- ✅ **Pricing edits** (service price via PATCH, audited) — per-city prices,
+  visiting charge, commission % still 🔜
+- ✅ **Promo banner**: title/subtitle/on-off from the panel — coupons 🔜
+- ✅ **Feature flags**: maintenance mode + min-build force update (build
+  number = CI run number, shown in app Settings)
+- ✅ KYC verify queue with document viewer
 - 🔜 **Remote branding**: app name, logo, colors, support contacts via app-config
-- 🔜 **Feature flags**: maintenance mode, min app version, dispatch tuning knobs
-- 🔜 KYC verify queue · booking monitor + manual re-dispatch
+- 🔜 Booking monitor + manual re-dispatch · dispatch tuning knobs
 - 📋 Maker-checker approval queue for money-sensitive changes
 - 📋 White-label build pipeline (rebranded APK from one GitHub Actions click)
 - 📋 Web panel (Flutter Web): dashboards, live ops map, refunds, disputes, CSV export

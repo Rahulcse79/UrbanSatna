@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Servexa API (UrbanSatna platform)
-  version: 0.2.0
+  version: 0.4.0
   description: |
     Service marketplace API. Source of truth for the REST contract.
     Every response uses the envelope `{ success, data, error, meta }`;
@@ -15,6 +15,8 @@ info:
 
 servers:
   - url: http://localhost:8080
+  - url: https://urbansatna.onrender.com
+    description: production (Render)
 
 tags:
   - name: system
@@ -23,6 +25,7 @@ tags:
   - name: catalog
   - name: bookings
   - name: jobs
+  - name: admin
 
 paths:
   /health:
@@ -39,12 +42,14 @@ paths:
   /api/v1/app-config:
     get:
       tags: [system]
-      summary: "Public runtime app config: {allow_server_url_change} (default true)"
+      summary: >-
+        Public runtime config: {allow_server_url_change, promo_enabled,
+        promo_title?, promo_subtitle?, maintenance_mode, min_build}
       responses: { "200": { description: config } }
     patch:
       tags: [system]
       security: [{ bearerAuth: [] }]
-      summary: Admin toggles runtime flags (perm settings:manage)
+      summary: Admin edits any subset of the flags above (perm settings:manage)
       responses: { "200": { description: updated config }, "403": { description: FORBIDDEN } }
 
   /api/v1/auth/otp/request:
@@ -99,12 +104,44 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: Update full_name / email
       responses: { "200": { description: updated profile } }
+  /api/v1/me/avatar:
+    get:
+      tags: [profile]
+      security: [{ bearerAuth: [] }]
+      summary: Own profile photo (image bytes); 404 when unset
+      responses: { "200": { description: image/png or image/jpeg }, "404": { description: none } }
+    post:
+      tags: [profile]
+      security: [{ bearerAuth: [] }]
+      summary: Upload profile photo — raw body, PNG/JPG, ≤ 1 MB, magic-byte checked
+      responses: { "200": { description: updated }, "422": { description: VALIDATION_ERROR } }
+  /api/v1/me/worker-application:
+    get:
+      tags: [profile]
+      security: [{ bearerAuth: [] }]
+      summary: Latest worker application (null when never applied)
+      responses: { "200": { description: "WorkerApplication | null" } }
+    post:
+      tags: [profile]
+      security: [{ bearerAuth: [] }]
+      summary: >-
+        Apply to become a worker {skills?, experience?}. Role is granted
+        only on admin approval. Staff (admin) accounts are rejected.
+      responses: { "200": { description: pending application }, "409": { description: CONFLICT } }
+  /api/v1/me/worker-application/kyc/{kind}:
+    post:
+      tags: [profile]
+      security: [{ bearerAuth: [] }]
+      summary: "Attach KYC photo to pending application; kind: doc | selfie (PNG/JPG ≤ 1 MB)"
+      parameters: [{ name: kind, in: path, required: true, schema: { type: string, enum: [doc, selfie] } }]
+      responses: { "200": { description: uploaded }, "409": { description: no pending application } }
   /api/v1/me/become-worker:
     post:
       tags: [profile]
       security: [{ bearerAuth: [] }]
-      summary: Self-service worker role (test phase; KYC flow replaces this)
-      responses: { "200": { description: role granted; refresh token to activate } }
+      deprecated: true
+      summary: Legacy alias of POST /me/worker-application (old APKs)
+      responses: { "200": { description: pending application } }
 
   /api/v1/categories:
     get:
@@ -122,12 +159,26 @@ paths:
       summary: Active services of a category (public)
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { "200": { description: "[{id,name,description,base_price_paise,duration_min}]" } }
+  /api/v1/categories/{id}:
+    patch:
+      tags: [catalog]
+      security: [{ bearerAuth: [] }]
+      summary: Update category {name?, icon?, sort_order?, is_active?} (perm catalog:manage)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: category }, "404": { description: NOT_FOUND } }
   /api/v1/services:
     post:
       tags: [catalog]
       security: [{ bearerAuth: [] }]
       summary: Create service (perm catalog:manage)
       responses: { "200": { description: service } }
+  /api/v1/services/{id}:
+    patch:
+      tags: [catalog]
+      security: [{ bearerAuth: [] }]
+      summary: Update service {name?, description?, base_price_paise?, duration_min?, is_active?}
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: service }, "404": { description: NOT_FOUND } }
 
   /api/v1/bookings:
     post:
@@ -163,8 +214,13 @@ paths:
     patch:
       tags: [jobs]
       security: [{ bearerAuth: [] }]
-      summary: "Assigned worker advances: {action: en_route|start|complete}"
-      responses: { "200": { description: Booking }, "409": { description: invalid transition } }
+      summary: >-
+        Assigned worker advances: {action: en_route|arrived|start|complete,
+        otp?}. `start` requires the customer's 4-digit arrival OTP.
+      responses:
+        "200": { description: Booking }
+        "401": { description: OTP_INVALID }
+        "409": { description: invalid transition }
 
   /api/v1/jobs/available:
     get:
@@ -185,6 +241,42 @@ paths:
       summary: "{completed_jobs, total_paise, avg_rating}"
       responses: { "200": { description: earnings } }
 
+  /api/v1/admin/worker-applications:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Verification queue; ?status=pending(default)|approved|rejected (perm workers:verify)
+      responses: { "200": { description: "[WorkerApplication]" } }
+  /api/v1/admin/worker-applications/{id}/decide:
+    post:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: "Approve/reject: {approve: bool, note?}. Approval grants the worker role atomically."
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: decided }, "409": { description: already decided } }
+  /api/v1/admin/worker-applications/{id}/kyc/{kind}:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: "KYC photo bytes; kind: doc | selfie (perm workers:verify)"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [doc, selfie] } }
+      responses: { "200": { description: image }, "404": { description: none } }
+  /api/v1/admin/catalog/categories:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: All categories incl. deactivated (perm catalog:manage)
+      responses: { "200": { description: "[Category]" } }
+  /api/v1/admin/catalog/categories/{id}/services:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: All services of a category incl. deactivated (perm catalog:manage)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: "[Service]" } }
+
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -200,20 +292,42 @@ components:
   schemas:
     Booking:
       type: object
-      description: Central booking object returned by all booking/job endpoints
+      description: |
+        Central booking object returned by all booking/job endpoints.
+        Redaction rules: `arrival_otp` appears only in customer responses;
+        `customer_phone` is hidden on the open job feed and revealed to the
+        assigned worker after accept (contact exchange like Uber).
       properties:
         id: { type: string, format: uuid }
-        status: { type: string, enum: [pending, accepted, en_route, in_progress, completed, cancelled] }
+        status: { type: string, enum: [pending, accepted, en_route, arrived, in_progress, completed, cancelled] }
         service_id: { type: string, format: uuid }
         service_name: { type: string }
         category_name: { type: string }
         customer_id: { type: string, format: uuid }
         customer_name: { type: string, nullable: true }
+        customer_phone: { type: string, nullable: true }
         worker_id: { type: string, format: uuid, nullable: true }
         worker_name: { type: string, nullable: true }
+        worker_phone: { type: string, nullable: true }
         address: { type: string }
         note: { type: string, nullable: true }
         price_paise: { type: integer, format: int64 }
         rating: { type: integer, nullable: true }
         review: { type: string, nullable: true }
+        arrival_otp: { type: string, nullable: true, description: customer-only }
         created_at: { type: string, format: date-time }
+    WorkerApplication:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        phone: { type: string }
+        full_name: { type: string, nullable: true }
+        status: { type: string, enum: [pending, approved, rejected] }
+        skills: { type: string, nullable: true }
+        experience: { type: string, nullable: true }
+        note: { type: string, nullable: true, description: admin decision note }
+        has_kyc_doc: { type: boolean }
+        has_kyc_selfie: { type: boolean }
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time, nullable: true }
