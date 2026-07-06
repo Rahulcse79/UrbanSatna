@@ -33,7 +33,12 @@ pub struct Booking {
     /// Worker-facing handlers must call `redact_for_worker` before responding.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arrival_otp: Option<String>,
+    pub cancel_reason: Option<String>,
     pub created_at: DateTime<Utc>,
+    pub accepted_at: Option<DateTime<Utc>>,
+    pub arrived_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub cancelled_at: Option<DateTime<Utc>>,
 }
 
 impl Booking {
@@ -57,7 +62,8 @@ const SELECT: &str = "SELECT b.id, b.status, b.service_id, s.name AS service_nam
        c.name AS category_name, b.customer_id, cu.full_name AS customer_name,
        cu.phone AS customer_phone, b.worker_id, w.full_name AS worker_name,
        w.phone AS worker_phone, b.address, b.note,
-       b.price_paise, b.rating, b.review, b.arrival_otp, b.created_at
+       b.price_paise, b.rating, b.review, b.arrival_otp, b.cancel_reason,
+       b.created_at, b.accepted_at, b.arrived_at, b.completed_at, b.cancelled_at
   FROM bookings b
   JOIN services s ON s.id = b.service_id
   JOIN categories c ON c.id = s.category_id
@@ -212,7 +218,12 @@ pub async fn advance(
     get(pg, id).await
 }
 
-pub async fn cancel(pg: &PgPool, id: Uuid, customer_id: Uuid) -> Result<Booking, AppError> {
+pub async fn cancel(
+    pg: &PgPool,
+    id: Uuid,
+    customer_id: Uuid,
+    reason: Option<&str>,
+) -> Result<Booking, AppError> {
     let booking = get(pg, id).await?;
     if booking.customer_id != customer_id {
         return Err(AppError::Forbidden);
@@ -224,12 +235,13 @@ pub async fn cancel(pg: &PgPool, id: Uuid, customer_id: Uuid) -> Result<Booking,
         )));
     }
     let updated = sqlx::query(
-        "UPDATE bookings SET status = 'cancelled', cancelled_at = now()
+        "UPDATE bookings SET status = 'cancelled', cancelled_at = now(), cancel_reason = $4
          WHERE id = $1 AND customer_id = $2 AND status = $3",
     )
     .bind(id)
     .bind(customer_id)
     .bind(&booking.status)
+    .bind(reason)
     .execute(pg)
     .await?;
     if updated.rows_affected() == 0 {

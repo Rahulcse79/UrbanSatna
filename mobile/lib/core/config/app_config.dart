@@ -12,6 +12,16 @@ class AppConfig {
     this.minBuild = 0,
     this.latestBuild = 0,
     this.requireLatest = false,
+    this.cityLabel,
+    this.appDisplayName,
+    this.tagline,
+    this.themePreset = 'indigo',
+    this.supportPhone,
+    this.announcementEnabled = false,
+    this.announcementText,
+    this.bookingsPaused = false,
+    this.bookingsPausedMessage,
+    this.maxActiveBookings = 5,
   });
 
   final bool allowServerUrlChange;
@@ -27,6 +37,20 @@ class AppConfig {
   /// blocked until updated.
   final int latestBuild;
   final bool requireLatest;
+
+  // Branding & text (admin-editable, null = built-in default)
+  final String? cityLabel;
+  final String? appDisplayName;
+  final String? tagline;
+  final String themePreset;
+  final String? supportPhone;
+  final bool announcementEnabled;
+  final String? announcementText;
+
+  // Booking controls (enforced server-side; mirrored for UI)
+  final bool bookingsPaused;
+  final String? bookingsPausedMessage;
+  final int maxActiveBookings;
 
   /// The build a device must have to pass the version gate.
   int get effectiveMinBuild =>
@@ -52,6 +76,16 @@ final appConfigProvider = FutureProvider.autoDispose<AppConfig>((ref) async {
       minBuild: data['min_build'] as int? ?? 0,
       latestBuild: data['latest_build'] as int? ?? 0,
       requireLatest: data['require_latest'] as bool? ?? false,
+      cityLabel: data['city_label'] as String?,
+      appDisplayName: data['app_display_name'] as String?,
+      tagline: data['tagline'] as String?,
+      themePreset: data['theme_preset'] as String? ?? 'indigo',
+      supportPhone: data['support_phone'] as String?,
+      announcementEnabled: data['announcement_enabled'] as bool? ?? false,
+      announcementText: data['announcement_text'] as String?,
+      bookingsPaused: data['bookings_paused'] as bool? ?? false,
+      bookingsPausedMessage: data['bookings_paused_message'] as String?,
+      maxActiveBookings: data['max_active_bookings'] as int? ?? 5,
     );
   } catch (_) {
     return const AppConfig(allowServerUrlChange: true);

@@ -6,9 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_controller.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/utils/image_pick.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../bookings/presentation/bookings_screen.dart' show callNumber;
 import '../../worker/data/worker_repository.dart';
 
 final meProvider =
@@ -101,6 +103,19 @@ class ProfileScreen extends ConsumerWidget {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/admin'),
                 ),
+              Consumer(builder: (context, ref, _) {
+                final supportPhone = ref.watch(appConfigProvider).maybeWhen(
+                    data: (c) => c.supportPhone, orElse: () => null);
+                if (supportPhone == null || supportPhone.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return ListTile(
+                  leading: const Icon(Icons.support_agent),
+                  title: Text(l10n.helpSupport),
+                  subtitle: Text(supportPhone),
+                  onTap: () => callNumber(supportPhone),
+                );
+              }),
               ListTile(
                 leading: const Icon(Icons.settings),
                 title: Text(l10n.settingsTitle),

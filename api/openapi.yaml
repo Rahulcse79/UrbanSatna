@@ -45,8 +45,12 @@ paths:
       summary: >-
         Public runtime config: {allow_server_url_change, promo_enabled,
         promo_title?, promo_subtitle?, maintenance_mode, min_build,
-        latest_build, require_latest}. Version gate: app is blocked when
+        latest_build, require_latest, city_label?, app_display_name?,
+        tagline?, theme_preset, support_phone?, announcement_enabled,
+        announcement_text?, bookings_paused, bookings_paused_message?,
+        max_active_bookings}. Version gate: app is blocked when
         build < min_build, or build < latest_build while require_latest.
+        theme_preset ∈ indigo|emerald|crimson|royal|ocean|sunset|teal|gold|rose.
       responses: { "200": { description: config } }
     patch:
       tags: [system]
@@ -186,8 +190,14 @@ paths:
     post:
       tags: [bookings]
       security: [{ bearerAuth: [] }]
-      summary: Create booking {service_id, address, note?}; price snapshotted
-      responses: { "200": { description: Booking }, "422": { description: VALIDATION_ERROR } }
+      summary: >-
+        Create booking {service_id, address, note?}; price snapshotted.
+        Blocked (409) while bookings_paused or when the customer already
+        has max_active_bookings active.
+      responses:
+        "200": { description: Booking }
+        "409": { description: paused / active cap reached }
+        "422": { description: VALIDATION_ERROR }
   /api/v1/bookings/mine:
     get:
       tags: [bookings]
@@ -198,7 +208,7 @@ paths:
     post:
       tags: [bookings]
       security: [{ bearerAuth: [] }]
-      summary: Customer cancels (pending/accepted only)
+      summary: "Customer cancels (pending/accepted only); body: {reason?}"
       responses: { "200": { description: Booking }, "409": { description: CONFLICT } }
   /api/v1/bookings/{id}/rate:
     post:

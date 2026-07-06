@@ -23,9 +23,11 @@ import sys
 import urllib.request
 
 BOOL_KEYS = {"maintenance_mode", "allow_server_url_change", "promo_enabled",
-             "require_latest"}
-INT_KEYS = {"min_build", "latest_build"}
-STR_KEYS = {"promo_title", "promo_subtitle"}
+             "require_latest", "announcement_enabled", "bookings_paused"}
+INT_KEYS = {"min_build", "latest_build", "max_active_bookings"}
+STR_KEYS = {"promo_title", "promo_subtitle", "city_label", "app_display_name",
+            "tagline", "support_phone", "announcement_text",
+            "bookings_paused_message", "theme_preset"}
 
 
 def call(base, method, path, token=None, body=None):

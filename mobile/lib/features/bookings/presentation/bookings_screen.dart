@@ -11,6 +11,11 @@ import '../domain/booking.dart';
 Future<void> callNumber(String phone) =>
     launchUrl(Uri(scheme: 'tel', path: phone));
 
+String _two(int n) => n < 10 ? '0$n' : '$n';
+
+String formatTime(DateTime t) =>
+    '${_two(t.day)}/${_two(t.month)} ${_two(t.hour)}:${_two(t.minute)}';
+
 String statusLabel(AppLocalizations l10n, String status) => switch (status) {
       'pending' => l10n.statusPending,
       'accepted' => l10n.statusAccepted,
@@ -187,12 +192,14 @@ class _BookingCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     return Card(
       elevation: 0,
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openDetails(context, ref),
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,18 +268,14 @@ class _BookingCard extends ConsumerWidget {
                 const Spacer(),
                 if (booking.cancellable)
                   TextButton(
-                    onPressed: () async {
-                      try {
-                        await ref
-                            .read(bookingsRepositoryProvider)
-                            .cancel(booking.id);
-                        _refresh(ref);
-                      } catch (e) {
-                        messenger.showSnackBar(
-                            SnackBar(content: Text(apiErrorMessage(e))));
-                      }
-                    },
+                    onPressed: () => _cancelWithReason(context, ref),
                     child: Text(l10n.cancelBooking),
+                  ),
+                if (scope == 'past' && booking.status == 'completed')
+                  TextButton.icon(
+                    icon: const Icon(Icons.replay, size: 18),
+                    label: Text(l10n.bookAgain),
+                    onPressed: () => _bookAgain(context, ref),
                   ),
                 if (booking.ratable)
                   FilledButton(
@@ -283,6 +286,171 @@ class _BookingCard extends ConsumerWidget {
             ),
           ],
         ),
+        ),
+      ),
+    );
+  }
+
+  /// Real apps ask why — the reason lands in the DB + audit log so
+  /// support/ops can see churn causes.
+  Future<void> _cancelWithReason(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final reasons = <(String, String)>[
+      ('change_of_plans', l10n.reasonChangeOfPlans),
+      ('price_too_high', l10n.reasonPrice),
+      ('booked_by_mistake', l10n.reasonMistake),
+      ('worker_delay', l10n.reasonDelay),
+      ('other', l10n.reasonOther),
+    ];
+    var selected = reasons.first.$1;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) => AlertDialog(
+          title: Text(l10n.cancelReasonTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final (key, label) in reasons)
+                RadioListTile<String>(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(label),
+                  value: key,
+                  groupValue: selected,
+                  onChanged: (v) => setState(() => selected = v ?? selected),
+                ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.cancelBooking),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref
+          .read(bookingsRepositoryProvider)
+          .cancel(booking.id, reason: selected);
+      _refresh(ref);
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
+    }
+  }
+
+  Future<void> _bookAgain(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(bookingsRepositoryProvider).create(
+            serviceId: booking.serviceId,
+            address: booking.address,
+            note: booking.note,
+          );
+      _refresh(ref);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.bookingCreated)));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
+    }
+  }
+
+  void _openDetails(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    booking.serviceName,
+                    style: Theme.of(sheetContext)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Text(
+                  booking.priceLabel,
+                  style: Theme.of(sheetContext)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(booking.address,
+                style: Theme.of(sheetContext).textTheme.bodySmall),
+            const SizedBox(height: 12),
+            _timelineRow(sheetContext, l10n.statusPending, booking.createdAt),
+            _timelineRow(
+                sheetContext, l10n.statusAccepted, booking.acceptedAt),
+            _timelineRow(sheetContext, l10n.statusArrived, booking.arrivedAt),
+            _timelineRow(
+                sheetContext, l10n.statusCompleted, booking.completedAt),
+            _timelineRow(
+                sheetContext, l10n.statusCancelled, booking.cancelledAt),
+            if (booking.cancelReason != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('${l10n.cancelReasonTitle} ${booking.cancelReason}',
+                    style: Theme.of(sheetContext).textTheme.bodySmall),
+              ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.share, size: 18),
+                    label: Text(l10n.shareStatus),
+                    onPressed: () {
+                      final text = '${booking.serviceName} — '
+                          '${statusLabel(l10n, booking.status)} · Servexa';
+                      launchUrl(
+                        Uri.parse(
+                            'https://wa.me/?text=${Uri.encodeComponent(text)}'),
+                        mode: LaunchMode.externalApplication,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _timelineRow(BuildContext context, String label, DateTime? time) {
+    if (time == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle,
+              size: 16, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          const Spacer(),
+          Text(formatTime(time),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.outline)),
+        ],
       ),
     );
   }

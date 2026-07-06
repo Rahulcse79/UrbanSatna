@@ -82,7 +82,10 @@ class BookingsRepository {
         if (otp != null && otp.isNotEmpty) 'otp': otp,
       });
 
-  Future<void> cancel(String id) => _dio.post('/api/v1/bookings/$id/cancel');
+  Future<void> cancel(String id, {String? reason}) =>
+      _dio.post('/api/v1/bookings/$id/cancel', data: {
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      });
 
   Future<void> rate(String id, int rating, String? review) =>
       _dio.post('/api/v1/bookings/$id/rate', data: {

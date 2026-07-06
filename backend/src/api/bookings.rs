@@ -4,9 +4,10 @@ use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
+use super::app_config;
 use super::envelope::ApiResponse;
 use crate::domain::error::AppError;
-use crate::infra::db::{audit, bookings};
+use crate::infra::db::{audit, bookings, settings};
 use crate::middleware::auth::CurrentUser;
 use crate::state::AppState;
 
@@ -25,6 +26,35 @@ pub async fn create(
     current.require_perm("bookings:create")?;
     if body.address.trim().len() < 5 {
         return Err(AppError::Validation("address is required".into()));
+    }
+    // Admin booking controls: holiday pause + per-customer active cap.
+    let paused = settings::get_json(&state.pg, app_config::BOOKINGS_PAUSED)
+        .await?
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if paused {
+        let message = settings::get_json(&state.pg, app_config::BOOKINGS_PAUSED_MESSAGE)
+            .await?
+            .and_then(|v| v.as_str().map(str::to_string))
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "bookings are temporarily paused, try again later".into());
+        return Err(AppError::Conflict(message));
+    }
+    let max_active = settings::get_json(&state.pg, app_config::MAX_ACTIVE_BOOKINGS)
+        .await?
+        .and_then(|v| v.as_i64())
+        .unwrap_or(5);
+    let active: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM bookings
+         WHERE customer_id = $1 AND status NOT IN ('completed','cancelled')",
+    )
+    .bind(current.id)
+    .fetch_one(&state.pg)
+    .await?;
+    if active >= max_active {
+        return Err(AppError::Conflict(format!(
+            "you already have {active} active bookings — complete or cancel one first"
+        )));
     }
     let booking = bookings::create(
         &state.pg,
@@ -145,12 +175,19 @@ pub async fn advance(
     Ok(Json(ApiResponse::ok(booking.redact_for_worker())))
 }
 
+#[derive(Deserialize, Default)]
+pub struct CancelBody {
+    pub reason: Option<String>,
+}
+
 pub async fn cancel(
     State(state): State<AppState>,
     current: CurrentUser,
     Path(id): Path<Uuid>,
+    body: Option<Json<CancelBody>>,
 ) -> Result<Json<ApiResponse<bookings::Booking>>, AppError> {
-    let booking = bookings::cancel(&state.pg, id, current.id).await?;
+    let reason = body.and_then(|Json(b)| b.reason).filter(|r| !r.is_empty());
+    let booking = bookings::cancel(&state.pg, id, current.id, reason.as_deref()).await?;
     audit::log(
         &state.pg,
         Some(current.id),
@@ -158,7 +195,7 @@ pub async fn cancel(
         "booking.cancelled",
         "booking",
         Some(id),
-        None,
+        reason.as_ref().map(|r| json!({ "reason": r })),
     )
     .await?;
     Ok(Json(ApiResponse::ok(booking)))

@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../l10n/gen/app_localizations.dart';
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
+    // Branding is admin-editable at runtime; built-in copy is the fallback.
+    final config = ref
+        .watch(appConfigProvider)
+        .maybeWhen(data: (c) => c, orElse: () => null);
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -31,7 +37,7 @@ class SplashScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                l10n.appTitle,
+                config?.appDisplayName ?? l10n.appTitle,
                 style: Theme.of(context)
                     .textTheme
                     .displaySmall
@@ -39,7 +45,7 @@ class SplashScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                l10n.tagline,
+                config?.tagline ?? l10n.tagline,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: scheme.onSurfaceVariant,

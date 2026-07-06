@@ -15,6 +15,29 @@ const MAINTENANCE_MODE: &str = "maintenance_mode";
 const MIN_BUILD: &str = "min_build";
 const LATEST_BUILD: &str = "latest_build";
 const REQUIRE_LATEST: &str = "require_latest";
+const CITY_LABEL: &str = "city_label";
+const APP_DISPLAY_NAME: &str = "app_display_name";
+const TAGLINE: &str = "tagline";
+const THEME_PRESET: &str = "theme_preset";
+const SUPPORT_PHONE: &str = "support_phone";
+const ANNOUNCEMENT_ENABLED: &str = "announcement_enabled";
+const ANNOUNCEMENT_TEXT: &str = "announcement_text";
+pub const BOOKINGS_PAUSED: &str = "bookings_paused";
+pub const BOOKINGS_PAUSED_MESSAGE: &str = "bookings_paused_message";
+pub const MAX_ACTIVE_BOOKINGS: &str = "max_active_bookings";
+
+/// The app falls back to its built-in look for unknown presets, so this
+/// list only guards against typos, not app versions.
+const THEME_PRESETS: &[&str] = &[
+    "indigo", "emerald", "crimson", "royal", "ocean", "sunset", "teal", "gold", "rose",
+];
+
+async fn get_str(state: &AppState, key: &str) -> Result<Option<String>, AppError> {
+    Ok(settings::get_json(&state.pg, key)
+        .await?
+        .and_then(|v| v.as_str().map(str::to_string))
+        .filter(|s| !s.is_empty()))
+}
 
 /// Runtime app configuration — the control plane the admin edits live
 /// (PRODUCT.md §6.5). Every field has a safe default so a missing row
@@ -32,6 +55,18 @@ pub struct AppConfig {
     pub latest_build: i64,
     /// Version gate: when on, only `latest_build` (or newer) may run.
     pub require_latest: bool,
+    // Branding & text — the app falls back to built-in copy when unset.
+    pub city_label: Option<String>,
+    pub app_display_name: Option<String>,
+    pub tagline: Option<String>,
+    pub theme_preset: String,
+    pub support_phone: Option<String>,
+    pub announcement_enabled: bool,
+    pub announcement_text: Option<String>,
+    // Booking controls
+    pub bookings_paused: bool,
+    pub bookings_paused_message: Option<String>,
+    pub max_active_bookings: i64,
 }
 
 async fn load(state: &AppState) -> Result<AppConfig, AppError> {
@@ -56,6 +91,18 @@ async fn load(state: &AppState) -> Result<AppConfig, AppError> {
         .await?
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
+    let announcement_enabled = settings::get_json(&state.pg, ANNOUNCEMENT_ENABLED)
+        .await?
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let bookings_paused = settings::get_json(&state.pg, BOOKINGS_PAUSED)
+        .await?
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let max_active_bookings = settings::get_json(&state.pg, MAX_ACTIVE_BOOKINGS)
+        .await?
+        .and_then(|v| v.as_i64())
+        .unwrap_or(5);
     Ok(AppConfig {
         allow_server_url_change: allow,
         promo_enabled: promo
@@ -77,6 +124,18 @@ async fn load(state: &AppState) -> Result<AppConfig, AppError> {
         min_build,
         latest_build,
         require_latest,
+        city_label: get_str(state, CITY_LABEL).await?,
+        app_display_name: get_str(state, APP_DISPLAY_NAME).await?,
+        tagline: get_str(state, TAGLINE).await?,
+        theme_preset: get_str(state, THEME_PRESET)
+            .await?
+            .unwrap_or_else(|| "indigo".to_string()),
+        support_phone: get_str(state, SUPPORT_PHONE).await?,
+        announcement_enabled,
+        announcement_text: get_str(state, ANNOUNCEMENT_TEXT).await?,
+        bookings_paused,
+        bookings_paused_message: get_str(state, BOOKINGS_PAUSED_MESSAGE).await?,
+        max_active_bookings,
     })
 }
 
@@ -96,6 +155,16 @@ pub struct UpdateAppConfig {
     pub min_build: Option<i64>,
     pub latest_build: Option<i64>,
     pub require_latest: Option<bool>,
+    pub city_label: Option<String>,
+    pub app_display_name: Option<String>,
+    pub tagline: Option<String>,
+    pub theme_preset: Option<String>,
+    pub support_phone: Option<String>,
+    pub announcement_enabled: Option<bool>,
+    pub announcement_text: Option<String>,
+    pub bookings_paused: Option<bool>,
+    pub bookings_paused_message: Option<String>,
+    pub max_active_bookings: Option<i64>,
 }
 
 /// Admin: toggle app behavior at runtime (perm settings:manage).
@@ -143,6 +212,46 @@ pub async fn update(
     if let Some(require_latest) = body.require_latest {
         settings::set_json(&state.pg, REQUIRE_LATEST, json!(require_latest)).await?;
         changed.insert(REQUIRE_LATEST.into(), json!(require_latest));
+    }
+    if let Some(preset) = body.theme_preset.as_deref() {
+        if !THEME_PRESETS.contains(&preset) {
+            return Err(AppError::Validation(format!(
+                "theme_preset must be one of {THEME_PRESETS:?}"
+            )));
+        }
+        settings::set_json(&state.pg, THEME_PRESET, json!(preset)).await?;
+        changed.insert(THEME_PRESET.into(), json!(preset));
+    }
+    // Free-text branding fields: an empty string clears back to defaults.
+    for (key, value) in [
+        (CITY_LABEL, &body.city_label),
+        (APP_DISPLAY_NAME, &body.app_display_name),
+        (TAGLINE, &body.tagline),
+        (SUPPORT_PHONE, &body.support_phone),
+        (ANNOUNCEMENT_TEXT, &body.announcement_text),
+        (BOOKINGS_PAUSED_MESSAGE, &body.bookings_paused_message),
+    ] {
+        if let Some(text) = value {
+            settings::set_json(&state.pg, key, json!(text.trim())).await?;
+            changed.insert(key.into(), json!(text.trim()));
+        }
+    }
+    if let Some(enabled) = body.announcement_enabled {
+        settings::set_json(&state.pg, ANNOUNCEMENT_ENABLED, json!(enabled)).await?;
+        changed.insert(ANNOUNCEMENT_ENABLED.into(), json!(enabled));
+    }
+    if let Some(paused) = body.bookings_paused {
+        settings::set_json(&state.pg, BOOKINGS_PAUSED, json!(paused)).await?;
+        changed.insert(BOOKINGS_PAUSED.into(), json!(paused));
+    }
+    if let Some(max) = body.max_active_bookings {
+        if !(1..=100).contains(&max) {
+            return Err(AppError::Validation(
+                "max_active_bookings must be 1-100".into(),
+            ));
+        }
+        settings::set_json(&state.pg, MAX_ACTIVE_BOOKINGS, json!(max)).await?;
+        changed.insert(MAX_ACTIVE_BOOKINGS.into(), json!(max));
     }
 
     if !changed.is_empty() {

@@ -33,10 +33,14 @@ class ServexaApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+    // The look is admin-controlled: the server names one of the built-in
+    // presets and every user's app re-skins on next config fetch.
+    final preset = ref.watch(appConfigProvider).maybeWhen(
+        data: (c) => c.themePreset, orElse: () => 'indigo');
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: AppTheme.light(preset),
+      darkTheme: AppTheme.dark(preset),
       themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
       localizationsDelegates: AppLocalizations.localizationsDelegates,

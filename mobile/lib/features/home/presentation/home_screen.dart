@@ -9,6 +9,7 @@ import '../../bookings/presentation/bookings_screen.dart'
     show statusColor, statusLabel;
 import '../../catalog/data/catalog_repository.dart';
 import '../../catalog/domain/models.dart';
+import '../../profile/presentation/profile_screen.dart' show meProvider;
 import '../../shell/current_tab.dart';
 
 IconData categoryIcon(String? key) => switch (key) {
@@ -90,12 +91,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                        sliver: SliverToBoxAdapter(child: _greeting(context)),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                         sliver: SliverToBoxAdapter(
-                          child: Text(
-                            l10n.greetingTitle,
-                            style: Theme.of(context).textTheme.headlineSmall,
-                          ),
-                        ),
+                            child: _announcement(context)),
                       ),
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -150,15 +151,84 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  /// Greeting personalizes with the profile name when available.
+  Widget _greeting(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final name = ref.watch(meProvider).maybeWhen(
+        data: (me) => (me['full_name'] as String?)?.trim(),
+        orElse: () => null);
+    final first =
+        (name?.isNotEmpty ?? false) ? name!.split(' ').first : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (first != null)
+          Text(
+            '${l10n.hiLabel} $first',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600),
+          ),
+        Text(
+          l10n.greetingTitle,
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+      ],
+    );
+  }
+
+  /// Admin announcement strip (e.g. holiday notice); hidden by default.
+  Widget _announcement(BuildContext context) {
+    final config = ref
+        .watch(appConfigProvider)
+        .maybeWhen(data: (c) => c, orElse: () => null);
+    final text = config?.announcementText;
+    if (config == null ||
+        !config.announcementEnabled ||
+        text == null ||
+        text.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final fg = dark ? Colors.amber.shade200 : Colors.amber.shade900;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: dark
+            ? Colors.amber.shade900.withValues(alpha: 0.3)
+            : Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.campaign, size: 18, color: fg),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: fg, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _header(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
+    final cityLabel = ref.watch(appConfigProvider).maybeWhen(
+        data: (c) => c.cityLabel, orElse: () => null);
     return Row(
       children: [
         Icon(Icons.place, size: 18, color: scheme.primary),
         const SizedBox(width: 4),
         Text(
-          l10n.cityLabel,
+          cityLabel ?? l10n.cityLabel,
           style: Theme.of(context)
               .textTheme
               .labelLarge
@@ -205,12 +275,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
     final title = config?.promoTitle ?? l10n.promoTitle;
     final subtitle = config?.promoSubtitle ?? l10n.promoSubtitle;
+    final primary = Theme.of(context).colorScheme.primary;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+        gradient: LinearGradient(
+          colors: [
+            primary,
+            Color.lerp(primary, Colors.black, 0.3) ?? primary,
+          ],
         ),
       ),
       child: Row(
