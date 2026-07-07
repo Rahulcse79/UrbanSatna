@@ -116,7 +116,9 @@ class TicketCard extends StatelessWidget {
             Text(formatTime(ticket.createdAt),
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.outline)),
-            if (ticket.resolution != null) ...[
+            // A reopened ticket is open again — its old resolution is
+            // history, not the current answer.
+            if (ticket.resolution != null && !ticket.open) ...[
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,

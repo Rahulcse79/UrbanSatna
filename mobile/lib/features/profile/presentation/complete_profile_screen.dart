@@ -185,7 +185,11 @@ class _CompleteProfileScreenState
               ),
             ),
             const SizedBox(height: 14),
+            // Keyed by state: switching state must rebuild this field,
+            // otherwise the old city (absent from the new item list)
+            // trips Flutter's dropdown assertion.
             DropdownButtonFormField<String>(
+              key: ValueKey(_state),
               initialValue: _city,
               isExpanded: true,
               items: [

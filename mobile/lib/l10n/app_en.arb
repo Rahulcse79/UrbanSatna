@@ -229,6 +229,8 @@
   "searchAllServices": "Search all services",
   "noResults": "No services found",
   "anyPrice": "Any price",
+  "statusTitle": "Status",
+  "botName": "Servexa Bot",
   "uploadId": "Upload ID",
   "uploadSelfie": "Upload selfie",
   "viewId": "View ID",

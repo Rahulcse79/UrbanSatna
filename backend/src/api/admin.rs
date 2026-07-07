@@ -148,7 +148,18 @@ pub async fn unlock_login(
         "user.login_unlocked",
         "user",
         None,
-        Some(json!({ "phone_suffix": body.phone.chars().rev().take(4).collect::<String>() })),
+        Some(json!({
+            "phone_suffix": body
+                .phone
+                .trim()
+                .chars()
+                .rev()
+                .take(4)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<String>()
+        })),
     )
     .await?;
     Ok(Json(ApiResponse::ok(json!({ "unlocked": true }))))

@@ -134,8 +134,8 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
             Text('${l10n.phoneLabel}: ${user.phone}'),
             if (user.city != null) Text('${l10n.cityFieldLabel}: ${user.city}'),
             Text('${l10n.navProfile}: ${user.roles.join(', ')}'),
-            Text('${l10n.statusPending.split(' ').first}: '
-                '${user.isBlocked ? l10n.blockedLabel : l10n.active}'),
+            Text(
+                '${l10n.statusTitle}: ${user.isBlocked ? l10n.blockedLabel : l10n.active}'),
             if (user.blockReason != null)
               Text('${l10n.blockReasonLabel}: ${user.blockReason}'),
             Text(formatTime(user.createdAt),

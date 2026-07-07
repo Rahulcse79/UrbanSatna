@@ -34,7 +34,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool get _phoneValid {
     final p = _phone.text.trim();
-    return p.length == 10 && p.split('').every((c) => '0123456789'.contains(c));
+    // 10 digits for +91; other admin-enabled countries vary (8-12).
+    final expected = _countryCode == '+91' ? (10, 10) : (8, 12);
+    return p.length >= expected.$1 &&
+        p.length <= expected.$2 &&
+        p.split('').every((c) => '0123456789'.contains(c));
   }
 
   Future<void> _sendOtp() async {
@@ -142,7 +146,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       controller: _phone,
                       enabled: !_otpSent,
                       keyboardType: TextInputType.phone,
-                      maxLength: 10,
+                      maxLength: 12,
                       decoration: InputDecoration(
                         labelText: l10n.phoneLabel,
                         hintText: '9876543210',

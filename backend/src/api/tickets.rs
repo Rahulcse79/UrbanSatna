@@ -56,23 +56,30 @@ pub async fn mine(
 pub struct QueueQuery {
     #[serde(default)]
     pub status: Option<String>,
+    #[serde(default)]
+    pub page: Option<i64>,
 }
 
-/// Admin queue. Gated on bookings:manage:any until a dedicated support
-/// role/permission lands (PRODUCT.md §6.6).
+/// Admin queue, paginated 10/page. Gated on bookings:manage:any until a
+/// dedicated support role/permission lands (PRODUCT.md §6.6).
 pub async fn list(
     State(state): State<AppState>,
     current: CurrentUser,
     Query(q): Query<QueueQuery>,
-) -> Result<Json<ApiResponse<Vec<tickets::Ticket>>>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     current.require_perm("bookings:manage:any")?;
     let status = q.status.as_deref().unwrap_or("open");
     if !matches!(status, "open" | "resolved" | "closed") {
         return Err(AppError::Validation("invalid status filter".into()));
     }
-    Ok(Json(ApiResponse::ok(
-        tickets::list(&state.pg, status).await?,
-    )))
+    let page = q.page.unwrap_or(1).max(1);
+    let (items, total) = tickets::list(&state.pg, status, page).await?;
+    Ok(Json(ApiResponse::ok(json!({
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": 10,
+    }))))
 }
 
 /// Customer reopens their resolved ticket (blocked once admin closes it).

@@ -63,16 +63,23 @@ pub async fn mine(pg: &PgPool, user_id: Uuid) -> Result<Vec<Ticket>, AppError> {
     .await?)
 }
 
-/// Admin queue: open tickets oldest-first so nobody waits forever.
-pub async fn list(pg: &PgPool, status: &str) -> Result<Vec<Ticket>, AppError> {
-    Ok(sqlx::query_as::<_, Ticket>(&format!(
+/// Admin queue, 10 per page: open tickets oldest-first so nobody waits.
+pub async fn list(pg: &PgPool, status: &str, page: i64) -> Result<(Vec<Ticket>, i64), AppError> {
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM tickets WHERE status = $1")
+        .bind(status)
+        .fetch_one(pg)
+        .await?;
+    let items = sqlx::query_as::<_, Ticket>(&format!(
         "{SELECT} WHERE t.status = $1
          ORDER BY CASE WHEN t.status = 'open' THEN t.created_at END ASC,
-                  t.created_at DESC"
+                  t.created_at DESC
+         LIMIT 10 OFFSET $2"
     ))
     .bind(status)
+    .bind((page - 1).max(0) * 10)
     .fetch_all(pg)
-    .await?)
+    .await?;
+    Ok((items, total))
 }
 
 /// Customer reopens a resolved ticket (never a closed one — closed is

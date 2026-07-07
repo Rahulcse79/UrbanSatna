@@ -229,6 +229,8 @@
   "searchAllServices": "सभी सेवाएं खोजें",
   "noResults": "कोई सेवा नहीं मिली",
   "anyPrice": "कोई भी कीमत",
+  "statusTitle": "स्थिति",
+  "botName": "Servexa बॉट",
   "uploadId": "पहचान पत्र अपलोड करें",
   "uploadSelfie": "सेल्फी अपलोड करें",
   "viewId": "पहचान पत्र देखें",
