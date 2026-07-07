@@ -5,6 +5,7 @@ pub mod chat;
 pub mod coupons;
 pub mod sessions;
 pub mod settings;
+pub mod support;
 pub mod tickets;
 pub mod users;
 pub mod workers;

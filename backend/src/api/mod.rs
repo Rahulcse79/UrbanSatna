@@ -8,6 +8,7 @@ pub mod coupons;
 pub mod envelope;
 pub mod health;
 pub mod me;
+pub mod support;
 pub mod tickets;
 
 use axum::extract::DefaultBodyLimit;
@@ -78,6 +79,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/categories/{id}", patch(catalog::update_category))
         .route("/categories/{id}/services", get(catalog::list_services))
+        .route("/services/search", get(catalog::search))
         .route("/services", post(catalog::create_service))
         .route("/services/{id}", patch(catalog::update_service))
         // customer bookings
@@ -104,8 +106,19 @@ pub fn router(state: AppState) -> Router {
         .route("/admin/tickets", get(tickets::list))
         .route("/admin/tickets/{id}/resolve", post(tickets::resolve))
         .route("/admin/tickets/{id}/close", post(tickets::close))
+        // live support chat (user thread + admin inbox)
+        .route(
+            "/support/messages",
+            get(support::my_thread).post(support::send),
+        )
+        .route("/admin/support/threads", get(support::threads))
+        .route(
+            "/admin/support/{user_id}/messages",
+            get(support::admin_thread).post(support::admin_send),
+        )
         // admin: dashboard, user management, activity logs
         .route("/admin/stats", get(admin::stats))
+        .route("/admin/users/unlock-login", post(admin::unlock_login))
         .route("/admin/users", get(admin::list_users))
         .route("/admin/users/{id}/block", post(admin::block_user))
         .route("/admin/users/{id}/unblock", post(admin::unblock_user))

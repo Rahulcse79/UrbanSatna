@@ -127,6 +127,34 @@ pub async fn unblock_user(
 }
 
 #[derive(Deserialize)]
+pub struct UnlockBody {
+    pub phone: String,
+}
+
+/// Clears the escalating OTP lock + counters for a phone (perm
+/// users:manage:any) — the manual unlock from the requirements.
+pub async fn unlock_login(
+    State(state): State<AppState>,
+    current: CurrentUser,
+    Json(body): Json<UnlockBody>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    current.require_perm("users:manage:any")?;
+    let mut redis = state.redis.clone();
+    crate::infra::otp::unlock(&mut redis, body.phone.trim()).await?;
+    audit::log(
+        &state.pg,
+        Some(current.id),
+        "admin",
+        "user.login_unlocked",
+        "user",
+        None,
+        Some(json!({ "phone_suffix": body.phone.chars().rev().take(4).collect::<String>() })),
+    )
+    .await?;
+    Ok(Json(ApiResponse::ok(json!({ "unlocked": true }))))
+}
+
+#[derive(Deserialize)]
 pub struct LogsQuery {
     #[serde(default)]
     pub q: Option<String>,

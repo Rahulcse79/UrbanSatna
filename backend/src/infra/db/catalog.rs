@@ -70,6 +70,44 @@ pub async fn list_services_all(pg: &PgPool, category_id: Uuid) -> Result<Vec<Ser
     .await?)
 }
 
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct SearchResult {
+    pub id: Uuid,
+    pub category_id: Uuid,
+    pub category_name: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub base_price_paise: i64,
+    pub duration_min: i32,
+}
+
+/// Advanced search across service name/description/category, optional
+/// price ceiling; active rows only.
+pub async fn search(
+    pg: &PgPool,
+    q: &str,
+    max_price_paise: Option<i64>,
+) -> Result<Vec<SearchResult>, AppError> {
+    Ok(sqlx::query_as::<_, SearchResult>(
+        "SELECT s.id, s.category_id, c.name AS category_name, s.name,
+                s.description, s.base_price_paise, s.duration_min
+         FROM services s
+         JOIN categories c ON c.id = s.category_id
+         WHERE s.is_active AND s.deleted_at IS NULL
+           AND c.is_active AND c.deleted_at IS NULL
+           AND ($1 = '' OR s.name ILIKE '%' || $1 || '%'
+                        OR s.description ILIKE '%' || $1 || '%'
+                        OR c.name ILIKE '%' || $1 || '%')
+           AND ($2::bigint IS NULL OR s.base_price_paise <= $2)
+         ORDER BY s.base_price_paise ASC
+         LIMIT 50",
+    )
+    .bind(q)
+    .bind(max_price_paise)
+    .fetch_all(pg)
+    .await?)
+}
+
 pub async fn create_category(
     pg: &PgPool,
     name: &str,

@@ -1,4 +1,4 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
@@ -24,6 +24,29 @@ pub async fn list_services(
 ) -> Result<Json<ApiResponse<Vec<catalog::Service>>>, AppError> {
     Ok(Json(ApiResponse::ok(
         catalog::list_services(&state.pg, category_id).await?,
+    )))
+}
+
+#[derive(Deserialize)]
+pub struct SearchQuery {
+    #[serde(default)]
+    pub q: Option<String>,
+    #[serde(default)]
+    pub max_price_paise: Option<i64>,
+}
+
+/// Public advanced search across all services.
+pub async fn search(
+    State(state): State<AppState>,
+    Query(query): Query<SearchQuery>,
+) -> Result<Json<ApiResponse<Vec<catalog::SearchResult>>>, AppError> {
+    Ok(Json(ApiResponse::ok(
+        catalog::search(
+            &state.pg,
+            query.q.unwrap_or_default().trim(),
+            query.max_price_paise,
+        )
+        .await?,
     )))
 }
 

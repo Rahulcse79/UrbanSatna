@@ -30,6 +30,7 @@ const APP_VERSION_LABEL: &str = "app_version_label";
 const COUNTRY_CODES: &str = "country_codes";
 const TERMS_URL: &str = "terms_url";
 const PRIVACY_URL: &str = "privacy_url";
+const SUPPORT_ONLINE: &str = "support_online";
 
 /// The app falls back to its built-in look for unknown presets, so this
 /// list only guards against typos, not app versions.
@@ -80,6 +81,8 @@ pub struct AppConfig {
     pub country_codes: Vec<String>,
     pub terms_url: Option<String>,
     pub privacy_url: Option<String>,
+    /// Live-support indicator: green (true) / red (false) in the app.
+    pub support_online: bool,
 }
 
 async fn load(state: &AppState) -> Result<AppConfig, AppError> {
@@ -160,6 +163,10 @@ async fn load(state: &AppState) -> Result<AppConfig, AppError> {
             .collect(),
         terms_url: get_str(state, TERMS_URL).await?,
         privacy_url: get_str(state, PRIVACY_URL).await?,
+        support_online: settings::get_json(&state.pg, SUPPORT_ONLINE)
+            .await?
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
     })
 }
 
@@ -195,6 +202,7 @@ pub struct UpdateAppConfig {
     pub country_codes: Option<String>,
     pub terms_url: Option<String>,
     pub privacy_url: Option<String>,
+    pub support_online: Option<bool>,
 }
 
 /// Admin: toggle app behavior at runtime (perm settings:manage).
@@ -278,6 +286,10 @@ pub async fn update(
     if let Some(paused) = body.bookings_paused {
         settings::set_json(&state.pg, BOOKINGS_PAUSED, json!(paused)).await?;
         changed.insert(BOOKINGS_PAUSED.into(), json!(paused));
+    }
+    if let Some(online) = body.support_online {
+        settings::set_json(&state.pg, SUPPORT_ONLINE, json!(online)).await?;
+        changed.insert(SUPPORT_ONLINE.into(), json!(online));
     }
     if let Some(max) = body.max_active_bookings {
         if !(1..=100).contains(&max) {
