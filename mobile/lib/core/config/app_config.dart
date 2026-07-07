@@ -27,6 +27,7 @@ class AppConfig {
     this.countryCodes = const ['+91'],
     this.termsUrl,
     this.privacyUrl,
+    this.supportOnline = false,
   });
 
   final bool allowServerUrlChange;
@@ -63,6 +64,9 @@ class AppConfig {
   final List<String> countryCodes;
   final String? termsUrl;
   final String? privacyUrl;
+
+  /// Live-support indicator: green (true) / red (false).
+  final bool supportOnline;
 
   /// The build a device must have to pass the version gate.
   int get effectiveMinBuild =>
@@ -106,6 +110,7 @@ final appConfigProvider = FutureProvider.autoDispose<AppConfig>((ref) async {
           const ['+91'],
       termsUrl: data['terms_url'] as String?,
       privacyUrl: data['privacy_url'] as String?,
+      supportOnline: data['support_online'] as bool? ?? false,
     );
   } catch (_) {
     return const AppConfig(allowServerUrlChange: true);
