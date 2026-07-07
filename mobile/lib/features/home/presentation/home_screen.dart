@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
@@ -41,6 +43,37 @@ IconData categoryIcon(String? key) => switch (key) {
       ? (s.shade900.withValues(alpha: 0.35), s.shade200)
       : (s.shade50, s.shade700);
 }
+
+/// Live GPS city for the header chip: uses the platform geocoder (no
+/// API key). Only runs when permission was already granted (the profile
+/// gate asks for it); silently falls back to the admin city label.
+final gpsCityProvider = FutureProvider.autoDispose<String?>((ref) async {
+  try {
+    final permission = await Geolocator.checkPermission();
+    if (permission != LocationPermission.whileInUse &&
+        permission != LocationPermission.always) {
+      return null;
+    }
+    final position = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.low,
+        timeLimit: Duration(seconds: 8),
+      ),
+    );
+    final placemarks =
+        await placemarkFromCoordinates(position.latitude, position.longitude);
+    if (placemarks.isEmpty) return null;
+    final place = placemarks.first;
+    final city = (place.locality?.isNotEmpty ?? false)
+        ? place.locality
+        : place.subAdministrativeArea;
+    if (city == null || city.isEmpty) return null;
+    final state = place.administrativeArea;
+    return (state == null || state.isEmpty) ? city : '$city, $state';
+  } catch (_) {
+    return null;
+  }
+});
 
 /// Customer home v2: location chip, greeting, search, promo banner,
 /// tinted category grid, pinned active-booking bar.
@@ -223,12 +256,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final scheme = Theme.of(context).colorScheme;
     final cityLabel = ref.watch(appConfigProvider).maybeWhen(
         data: (c) => c.cityLabel, orElse: () => null);
+    final gpsCity = ref
+        .watch(gpsCityProvider)
+        .maybeWhen(data: (c) => c, orElse: () => null);
     return Row(
       children: [
         Icon(Icons.place, size: 18, color: scheme.primary),
         const SizedBox(width: 4),
         Text(
-          cityLabel ?? l10n.cityLabel,
+          gpsCity ?? cityLabel ?? l10n.cityLabel,
           style: Theme.of(context)
               .textTheme
               .labelLarge
@@ -249,6 +285,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final scheme = Theme.of(context).colorScheme;
     return TextField(
       onChanged: (v) => setState(() => _query = v),
+      // Enter = full search across every service (server-side).
+      onSubmitted: (v) =>
+          context.push('/search?q=${Uri.encodeComponent(v.trim())}'),
       decoration: InputDecoration(
         hintText: l10n.searchServices,
         prefixIcon: const Icon(Icons.search),

@@ -8,9 +8,12 @@ import '../../features/admin/presentation/admin_users_screen.dart';
 import '../../features/admin/presentation/catalog_manager_screen.dart';
 import '../../features/admin/presentation/coupons_screen.dart';
 import '../../features/admin/presentation/worker_approvals_screen.dart';
+import '../../features/admin/presentation/support_inbox_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/jobs/presentation/earnings_screen.dart';
+import '../../features/search/presentation/search_screen.dart';
 import '../../features/support/presentation/my_tickets_screen.dart';
+import '../../features/support/presentation/support_chat_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/catalog/presentation/services_screen.dart';
@@ -95,6 +98,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => ChatScreen(
           bookingId: state.pathParameters['bookingId']!,
           title: state.uri.queryParameters['title'] ?? 'Chat',
+        ),
+      ),
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => SearchScreen(
+          initialQuery: state.uri.queryParameters['q'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/support-chat',
+        builder: (context, state) => const SupportChatScreen(),
+      ),
+      GoRoute(
+        path: '/admin/support',
+        builder: (context, state) => const SupportInboxScreen(),
+      ),
+      GoRoute(
+        path: '/admin/support/:userId',
+        builder: (context, state) => SupportChatScreen(
+          userId: state.pathParameters['userId'],
+          title: state.uri.queryParameters['title'],
         ),
       ),
     ],

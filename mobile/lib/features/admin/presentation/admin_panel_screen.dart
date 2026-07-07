@@ -138,6 +138,12 @@ class AdminPanelScreen extends ConsumerWidget {
             onTap: () => context.push('/admin/tickets'),
           ),
           ListTile(
+            leading: const Icon(Icons.forum),
+            title: Text(l10n.supportInbox),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/admin/support'),
+          ),
+          ListTile(
             leading: const Icon(Icons.local_offer),
             title: Text(l10n.couponsAdmin),
             trailing: const Icon(Icons.chevron_right),
@@ -167,6 +173,13 @@ class AdminPanelScreen extends ConsumerWidget {
                   value: c.maintenanceMode,
                   onChanged: (v) =>
                       _patch(context, ref, {'maintenance_mode': v}),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.support_agent),
+                  title: Text(l10n.supportOnlineToggle),
+                  value: c.supportOnline,
+                  onChanged: (v) =>
+                      _patch(context, ref, {'support_online': v}),
                 ),
                 ListTile(
                   leading: const Icon(Icons.campaign),
