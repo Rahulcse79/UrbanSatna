@@ -314,13 +314,19 @@ class _BookingCard extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               for (final (key, label) in reasons)
-                RadioListTile<String>(
+                ListTile(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                   title: Text(label),
-                  value: key,
-                  groupValue: selected,
-                  onChanged: (v) => setState(() => selected = v ?? selected),
+                  leading: Icon(
+                    selected == key
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    color: selected == key
+                        ? Theme.of(dialogContext).colorScheme.primary
+                        : null,
+                  ),
+                  onTap: () => setState(() => selected = key),
                 ),
             ],
           ),
