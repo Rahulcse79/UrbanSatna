@@ -67,12 +67,53 @@ pub async fn list(
 ) -> Result<Json<ApiResponse<Vec<tickets::Ticket>>>, AppError> {
     current.require_perm("bookings:manage:any")?;
     let status = q.status.as_deref().unwrap_or("open");
-    if !matches!(status, "open" | "resolved") {
+    if !matches!(status, "open" | "resolved" | "closed") {
         return Err(AppError::Validation("invalid status filter".into()));
     }
     Ok(Json(ApiResponse::ok(
         tickets::list(&state.pg, status).await?,
     )))
+}
+
+/// Customer reopens their resolved ticket (blocked once admin closes it).
+pub async fn reopen(
+    State(state): State<AppState>,
+    current: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<tickets::Ticket>>, AppError> {
+    let ticket = tickets::reopen(&state.pg, id, current.id).await?;
+    audit::log(
+        &state.pg,
+        Some(current.id),
+        "customer",
+        "ticket.reopened",
+        "ticket",
+        Some(id),
+        None,
+    )
+    .await?;
+    Ok(Json(ApiResponse::ok(ticket)))
+}
+
+/// Admin permanently closes a ticket; no reopen after this.
+pub async fn close(
+    State(state): State<AppState>,
+    current: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<tickets::Ticket>>, AppError> {
+    current.require_perm("bookings:manage:any")?;
+    let ticket = tickets::close(&state.pg, id, current.id).await?;
+    audit::log(
+        &state.pg,
+        Some(current.id),
+        "admin",
+        "ticket.closed",
+        "ticket",
+        Some(id),
+        None,
+    )
+    .await?;
+    Ok(Json(ApiResponse::ok(ticket)))
 }
 
 #[derive(Deserialize)]

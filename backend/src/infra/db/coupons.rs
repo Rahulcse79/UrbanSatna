@@ -56,6 +56,20 @@ pub async fn set_active(pg: &PgPool, id: Uuid, active: bool) -> Result<Coupon, A
     .ok_or(AppError::NotFound("coupon"))
 }
 
+/// Offers this user can still use: active and never redeemed by them.
+pub async fn available_for(pg: &PgPool, user_id: Uuid) -> Result<Vec<Coupon>, AppError> {
+    Ok(sqlx::query_as::<_, Coupon>(&format!(
+        "SELECT {COLS} FROM coupons c
+         WHERE c.is_active AND NOT EXISTS (
+            SELECT 1 FROM coupon_redemptions r
+             WHERE r.coupon_id = c.id AND r.user_id = $1)
+         ORDER BY c.created_at DESC"
+    ))
+    .bind(user_id)
+    .fetch_all(pg)
+    .await?)
+}
+
 /// Discount this user would get on `price_paise`, without redeeming.
 /// The final price never drops below ₹1 (schema requires price > 0).
 pub async fn preview(

@@ -75,6 +75,41 @@ pub async fn list(pg: &PgPool, status: &str) -> Result<Vec<Ticket>, AppError> {
     .await?)
 }
 
+/// Customer reopens a resolved ticket (never a closed one — closed is
+/// the admin's permanent state).
+pub async fn reopen(pg: &PgPool, id: Uuid, user_id: Uuid) -> Result<Ticket, AppError> {
+    let updated = sqlx::query(
+        "UPDATE tickets SET status = 'open'
+         WHERE id = $1 AND user_id = $2 AND status = 'resolved'",
+    )
+    .bind(id)
+    .bind(user_id)
+    .execute(pg)
+    .await?;
+    if updated.rows_affected() == 0 {
+        return Err(AppError::Conflict(
+            "ticket cannot be reopened (closed or not yours)".into(),
+        ));
+    }
+    get(pg, id).await
+}
+
+/// Admin permanently closes; the user cannot reopen after this.
+pub async fn close(pg: &PgPool, id: Uuid, admin_id: Uuid) -> Result<Ticket, AppError> {
+    let updated = sqlx::query(
+        "UPDATE tickets SET status = 'closed', resolved_by = $2, resolved_at = now()
+         WHERE id = $1 AND status <> 'closed'",
+    )
+    .bind(id)
+    .bind(admin_id)
+    .execute(pg)
+    .await?;
+    if updated.rows_affected() == 0 {
+        return Err(AppError::Conflict("ticket already closed".into()));
+    }
+    get(pg, id).await
+}
+
 pub async fn resolve(
     pg: &PgPool,
     id: Uuid,

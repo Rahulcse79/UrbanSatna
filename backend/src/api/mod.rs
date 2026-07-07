@@ -94,13 +94,22 @@ pub fn router(state: AppState) -> Router {
         .route("/bookings/{id}/status", patch(bookings::advance))
         // coupons (check for the booking screen; admin CRUD)
         .route("/coupons/check", get(coupons::check))
+        .route("/coupons/available", get(coupons::available))
         .route("/admin/coupons", get(coupons::list).post(coupons::create))
         .route("/admin/coupons/{id}", patch(coupons::update))
         // support tickets
         .route("/tickets", post(tickets::create))
         .route("/tickets/mine", get(tickets::mine))
+        .route("/tickets/{id}/reopen", post(tickets::reopen))
         .route("/admin/tickets", get(tickets::list))
         .route("/admin/tickets/{id}/resolve", post(tickets::resolve))
+        .route("/admin/tickets/{id}/close", post(tickets::close))
+        // admin: dashboard, user management, activity logs
+        .route("/admin/stats", get(admin::stats))
+        .route("/admin/users", get(admin::list_users))
+        .route("/admin/users/{id}/block", post(admin::block_user))
+        .route("/admin/users/{id}/unblock", post(admin::unblock_user))
+        .route("/admin/audit", get(admin::audit_logs))
         // booking chat (media uploads get a bigger body budget)
         .route(
             "/bookings/{id}/messages",

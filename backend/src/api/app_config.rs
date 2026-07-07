@@ -25,6 +25,11 @@ const ANNOUNCEMENT_TEXT: &str = "announcement_text";
 pub const BOOKINGS_PAUSED: &str = "bookings_paused";
 pub const BOOKINGS_PAUSED_MESSAGE: &str = "bookings_paused_message";
 pub const MAX_ACTIVE_BOOKINGS: &str = "max_active_bookings";
+const SUPPORT_EMAIL: &str = "support_email";
+const APP_VERSION_LABEL: &str = "app_version_label";
+const COUNTRY_CODES: &str = "country_codes";
+const TERMS_URL: &str = "terms_url";
+const PRIVACY_URL: &str = "privacy_url";
 
 /// The app falls back to its built-in look for unknown presets, so this
 /// list only guards against typos, not app versions.
@@ -67,6 +72,14 @@ pub struct AppConfig {
     pub bookings_paused: bool,
     pub bookings_paused_message: Option<String>,
     pub max_active_bookings: i64,
+    // Help, legal & registration
+    pub support_email: Option<String>,
+    /// Marketing version shown in the app (e.g. "v1.0.1"); admin-managed.
+    pub app_version_label: Option<String>,
+    /// Allowed phone country codes (registration dropdown), CSV-managed.
+    pub country_codes: Vec<String>,
+    pub terms_url: Option<String>,
+    pub privacy_url: Option<String>,
 }
 
 async fn load(state: &AppState) -> Result<AppConfig, AppError> {
@@ -136,6 +149,17 @@ async fn load(state: &AppState) -> Result<AppConfig, AppError> {
         bookings_paused,
         bookings_paused_message: get_str(state, BOOKINGS_PAUSED_MESSAGE).await?,
         max_active_bookings,
+        support_email: get_str(state, SUPPORT_EMAIL).await?,
+        app_version_label: get_str(state, APP_VERSION_LABEL).await?,
+        country_codes: get_str(state, COUNTRY_CODES)
+            .await?
+            .unwrap_or_else(|| "+91".to_string())
+            .split(',')
+            .map(|c| c.trim().to_string())
+            .filter(|c| !c.is_empty())
+            .collect(),
+        terms_url: get_str(state, TERMS_URL).await?,
+        privacy_url: get_str(state, PRIVACY_URL).await?,
     })
 }
 
@@ -165,6 +189,12 @@ pub struct UpdateAppConfig {
     pub bookings_paused: Option<bool>,
     pub bookings_paused_message: Option<String>,
     pub max_active_bookings: Option<i64>,
+    pub support_email: Option<String>,
+    pub app_version_label: Option<String>,
+    /// CSV, e.g. "+91,+971" — controls the registration dropdown.
+    pub country_codes: Option<String>,
+    pub terms_url: Option<String>,
+    pub privacy_url: Option<String>,
 }
 
 /// Admin: toggle app behavior at runtime (perm settings:manage).
@@ -230,6 +260,11 @@ pub async fn update(
         (SUPPORT_PHONE, &body.support_phone),
         (ANNOUNCEMENT_TEXT, &body.announcement_text),
         (BOOKINGS_PAUSED_MESSAGE, &body.bookings_paused_message),
+        (SUPPORT_EMAIL, &body.support_email),
+        (APP_VERSION_LABEL, &body.app_version_label),
+        (COUNTRY_CODES, &body.country_codes),
+        (TERMS_URL, &body.terms_url),
+        (PRIVACY_URL, &body.privacy_url),
     ] {
         if let Some(text) = value {
             settings::set_json(&state.pg, key, json!(text.trim())).await?;

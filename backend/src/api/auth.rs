@@ -80,6 +80,13 @@ pub async fn verify_otp(
     otp::verify(&mut redis, &body.phone, &body.otp, &state.config.jwt_secret).await?;
 
     let (user, created) = users::find_or_create_by_phone(&state.pg, &body.phone).await?;
+    // Blocked users cannot log in (admin lifts the block in User management).
+    if user.is_blocked {
+        return Err(AppError::Conflict(format!(
+            "account blocked: {}",
+            user.block_reason.as_deref().unwrap_or("contact support")
+        )));
+    }
     users::grant_role(&state.pg, user.id, "customer").await?;
     if state.config.admin_phones.contains(&body.phone) {
         users::grant_role(&state.pg, user.id, "admin").await?;
@@ -136,6 +143,9 @@ pub async fn refresh(
     )
     .await?;
     let user = users::get(&state.pg, user_id).await?;
+    if user.is_blocked {
+        return Err(AppError::Unauthorized);
+    }
     let pair = issue_tokens(&state, user, session_id, new_refresh).await?;
     Ok(Json(ApiResponse::ok(pair)))
 }

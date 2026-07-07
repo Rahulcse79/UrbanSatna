@@ -56,6 +56,17 @@ pub async fn list(
     Ok(Json(ApiResponse::ok(coupons::list(&state.pg).await?)))
 }
 
+/// Offers the signed-in user can still use (active, never redeemed by
+/// them) — powers the offer dropdown on the booking screen.
+pub async fn available(
+    State(state): State<AppState>,
+    current: CurrentUser,
+) -> Result<Json<ApiResponse<Vec<coupons::Coupon>>>, AppError> {
+    Ok(Json(ApiResponse::ok(
+        coupons::available_for(&state.pg, current.id).await?,
+    )))
+}
+
 #[derive(Deserialize)]
 pub struct NewCoupon {
     pub code: String,

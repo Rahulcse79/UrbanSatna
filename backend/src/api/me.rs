@@ -29,10 +29,17 @@ pub async fn get_me(
     Ok(Json(ApiResponse::ok(Me { user, roles })))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct UpdateMe {
     pub full_name: Option<String>,
     pub email: Option<String>,
+    pub address: Option<String>,
+    pub state: Option<String>,
+    pub city: Option<String>,
+    pub pincode: Option<String>,
+    /// First-registration T&C acceptance (stamped once, never cleared).
+    #[serde(default)]
+    pub accept_terms: bool,
 }
 
 pub async fn update_me(
@@ -45,11 +52,21 @@ pub async fn update_me(
             return Err(AppError::Validation("invalid email".into()));
         }
     }
+    if let Some(pin) = body.pincode.as_deref() {
+        if !pin.is_empty() && (pin.len() != 6 || !pin.chars().all(|c| c.is_ascii_digit())) {
+            return Err(AppError::Validation("PIN code must be 6 digits".into()));
+        }
+    }
     let user = users::update_profile(
         &state.pg,
         current.id,
         body.full_name.as_deref(),
         body.email.as_deref(),
+        body.address.as_deref(),
+        body.state.as_deref(),
+        body.city.as_deref(),
+        body.pincode.as_deref(),
+        body.accept_terms,
     )
     .await?;
     audit::log(
