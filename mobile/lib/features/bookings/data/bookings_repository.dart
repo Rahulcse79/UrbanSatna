@@ -25,6 +25,10 @@ final earningsProvider = FutureProvider.autoDispose<Earnings>((ref) {
   return ref.watch(bookingsRepositoryProvider).earnings();
 });
 
+final workerHistoryProvider = FutureProvider.autoDispose<List<Booking>>((ref) {
+  return ref.watch(bookingsRepositoryProvider).workerHistory();
+});
+
 class BookingsRepository {
   const BookingsRepository(this._dio);
 
@@ -41,6 +45,9 @@ class BookingsRepository {
     required String serviceId,
     required String address,
     String? note,
+    double? lat,
+    double? lng,
+    String? couponCode,
   }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '/api/v1/bookings',
@@ -48,9 +55,30 @@ class BookingsRepository {
         'service_id': serviceId,
         'address': address,
         if (note != null && note.isNotEmpty) 'note': note,
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
+        if (couponCode != null && couponCode.isNotEmpty)
+          'coupon_code': couponCode,
       },
     );
     return Booking.fromJson(unwrapEnvelope(res) as Map<String, dynamic>);
+  }
+
+  /// Live coupon quote for the booking sheet; throws on invalid/used.
+  Future<({int discountPaise, int finalPaise})> couponCheck(
+      String code, String serviceId) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/coupons/check?code=${Uri.encodeComponent(code)}&service_id=$serviceId');
+    final data = unwrapEnvelope(res) as Map<String, dynamic>;
+    return (
+      discountPaise: data['discount_paise'] as int,
+      finalPaise: data['final_paise'] as int,
+    );
+  }
+
+  Future<List<Booking>> workerHistory() async {
+    final res = await _dio.get<Map<String, dynamic>>('/api/v1/jobs/history');
+    return _list(res);
   }
 
   Future<List<Booking>> mine(String scope) async {

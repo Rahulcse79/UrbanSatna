@@ -19,6 +19,7 @@ dependencies:
   google_fonts: ^6.2.1
   url_launcher: ^6.3.0
   image_picker: ^1.1.2
+  geolocator: ^13.0.1
   intl: any # version pinned by flutter_localizations
 
 dev_dependencies:

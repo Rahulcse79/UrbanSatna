@@ -253,6 +253,83 @@ paths:
       summary: "{completed_jobs, total_paise, avg_rating}"
       responses: { "200": { description: earnings } }
 
+  /api/v1/jobs/history:
+    get:
+      tags: [jobs]
+      security: [{ bearerAuth: [] }]
+      summary: Worker payment history (completed jobs, newest first)
+      responses: { "200": { description: "[Booking]" } }
+  /api/v1/coupons/check:
+    get:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: "Quote a coupon for me: ?code=&service_id= → {discount_paise, final_paise}; 409 when already used (one use per user, forever)"
+      responses: { "200": { description: quote }, "404": { description: invalid }, "409": { description: already used } }
+  /api/v1/tickets:
+    post:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: Raise a support ticket {subject, message, booking_id?}
+      responses: { "200": { description: Ticket } }
+  /api/v1/tickets/mine:
+    get:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: My tickets with status + resolution
+      responses: { "200": { description: "[Ticket]" } }
+  /api/v1/bookings/{id}/messages:
+    get:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: Booking chat (participants; staff read via bookings:read:any)
+      responses: { "200": { description: "[ChatMessage]" }, "403": { description: FORBIDDEN } }
+    post:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: "Send text message {body} (participants only)"
+      responses: { "200": { description: ChatMessage } }
+  /api/v1/bookings/{id}/messages/attachment:
+    post:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: Attach media — raw body, PNG/JPG/MP4 ≤ 15 MB, magic-checked
+      responses: { "200": { description: ChatMessage }, "422": { description: VALIDATION_ERROR } }
+  /api/v1/bookings/{id}/messages/{mid}/attachment:
+    get:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: Download an attachment (participants/staff)
+      responses: { "200": { description: media bytes }, "404": { description: none } }
+  /api/v1/admin/coupons:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: List coupons (perm catalog:manage)
+      responses: { "200": { description: "[Coupon]" } }
+    post:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: "Create coupon {code, percent_off(1-90) XOR flat_off_paise}"
+      responses: { "200": { description: Coupon }, "409": { description: duplicate code } }
+  /api/v1/admin/coupons/{id}:
+    patch:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: "Toggle coupon {is_active} — redemptions never reset"
+      responses: { "200": { description: Coupon } }
+  /api/v1/admin/tickets:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Support queue ?status=open(default)|resolved (perm bookings:manage:any)
+      responses: { "200": { description: "[Ticket]" } }
+  /api/v1/admin/tickets/{id}/resolve:
+    post:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: "Resolve a ticket {resolution} (audited; once only)"
+      responses: { "200": { description: Ticket }, "409": { description: already resolved } }
+
   /api/v1/admin/worker-applications:
     get:
       tags: [admin]

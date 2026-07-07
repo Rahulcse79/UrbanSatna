@@ -11,6 +11,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/utils/image_pick.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../bookings/presentation/bookings_screen.dart' show callNumber;
+import '../../support/data/tickets_repository.dart';
 import '../../worker/data/worker_repository.dart';
 
 final meProvider =
@@ -117,6 +118,17 @@ class ProfileScreen extends ConsumerWidget {
                 );
               }),
               ListTile(
+                leading: const Icon(Icons.report_problem_outlined),
+                title: Text(l10n.reportProblem),
+                onTap: () => _reportProblem(context, ref),
+              ),
+              ListTile(
+                leading: const Icon(Icons.confirmation_number_outlined),
+                title: Text(l10n.myTickets),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/tickets'),
+              ),
+              ListTile(
                 leading: const Icon(Icons.settings),
                 title: Text(l10n.settingsTitle),
                 onTap: () => context.push('/settings'),
@@ -135,6 +147,61 @@ class ProfileScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  Future<void> _reportProblem(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final subject = TextEditingController();
+    final message = TextEditingController();
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.reportProblem),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: subject,
+              decoration: InputDecoration(
+                labelText: l10n.subjectLabel,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: message,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: l10n.messageLabel,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.submit),
+          ),
+        ],
+      ),
+    );
+    if (submitted != true ||
+        subject.text.trim().isEmpty ||
+        message.text.trim().isEmpty) {
+      return;
+    }
+    try {
+      await ref.read(ticketsRepositoryProvider).create(
+            subject: subject.text.trim(),
+            message: message.text.trim(),
+          );
+      ref.invalidate(myTicketsProvider);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.ticketCreated)));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
+    }
   }
 
   Future<void> _editName(BuildContext context, WidgetRef ref,

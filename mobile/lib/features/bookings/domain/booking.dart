@@ -20,6 +20,10 @@ class Booking {
     this.arrivedAt,
     this.completedAt,
     this.cancelledAt,
+    this.lat,
+    this.lng,
+    this.couponCode,
+    this.discountPaise = 0,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
@@ -39,6 +43,10 @@ class Booking {
         customerPhone: json['customer_phone'] as String?,
         workerPhone: json['worker_phone'] as String?,
         cancelReason: json['cancel_reason'] as String?,
+        lat: (json['lat'] as num?)?.toDouble(),
+        lng: (json['lng'] as num?)?.toDouble(),
+        couponCode: json['coupon_code'] as String?,
+        discountPaise: json['discount_paise'] as int? ?? 0,
         acceptedAt: _time(json['accepted_at']),
         arrivedAt: _time(json['arrived_at']),
         completedAt: _time(json['completed_at']),
@@ -75,6 +83,16 @@ class Booking {
   final DateTime? completedAt;
   final DateTime? cancelledAt;
 
+  /// Customer-shared GPS pin for precise navigation.
+  final double? lat;
+  final double? lng;
+
+  /// price is final (post-discount); these record the deal.
+  final String? couponCode;
+  final int discountPaise;
+
+  String get discountLabel => '₹${(discountPaise / 100).toStringAsFixed(0)}';
+
   String get priceLabel => '₹${(pricePaise / 100).toStringAsFixed(0)}';
   bool get cancellable => status == 'pending' || status == 'accepted';
   bool get ratable => status == 'completed' && rating == null;
@@ -108,18 +126,32 @@ class Earnings {
   const Earnings({
     required this.completedJobs,
     required this.totalPaise,
+    this.todayPaise = 0,
+    this.weekPaise = 0,
+    this.monthPaise = 0,
     this.avgRating,
   });
 
   factory Earnings.fromJson(Map<String, dynamic> json) => Earnings(
         completedJobs: json['completed_jobs'] as int,
         totalPaise: json['total_paise'] as int,
+        todayPaise: json['today_paise'] as int? ?? 0,
+        weekPaise: json['week_paise'] as int? ?? 0,
+        monthPaise: json['month_paise'] as int? ?? 0,
         avgRating: (json['avg_rating'] as num?)?.toDouble(),
       );
 
   final int completedJobs;
   final int totalPaise;
+  final int todayPaise;
+  final int weekPaise;
+  final int monthPaise;
   final double? avgRating;
 
-  String get totalLabel => '₹${(totalPaise / 100).toStringAsFixed(0)}';
+  static String rupees(int paise) => '₹${(paise / 100).toStringAsFixed(0)}';
+
+  String get totalLabel => rupees(totalPaise);
+  String get todayLabel => rupees(todayPaise);
+  String get weekLabel => rupees(weekPaise);
+  String get monthLabel => rupees(monthPaise);
 }

@@ -50,6 +50,18 @@ class AdminPanelScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/admin/catalog'),
           ),
+          ListTile(
+            leading: const Icon(Icons.confirmation_number),
+            title: Text(l10n.ticketsAdmin),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/admin/tickets'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.local_offer),
+            title: Text(l10n.couponsAdmin),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/admin/coupons'),
+          ),
           const Divider(),
           config.when(
             loading: () => const Padding(

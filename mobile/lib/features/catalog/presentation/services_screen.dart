@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_client.dart';
@@ -91,63 +92,164 @@ class _ServiceTile extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
+    final repo = ref.read(bookingsRepositoryProvider);
     final address = TextEditingController();
     final note = TextEditingController();
+    final coupon = TextEditingController();
+    double? lat;
+    double? lng;
+    int? quotedFinal;
+    String? appliedCoupon;
 
     final booked = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            16, 16, 16, MediaQuery.of(sheetContext).viewInsets.bottom + 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('${service.name} — ${service.priceLabel}',
-                style: Theme.of(sheetContext).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            TextField(
-              controller: address,
-              decoration: InputDecoration(
-                labelText: l10n.addressLabel,
-                border: const OutlineInputBorder(),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              16, 16, 16, MediaQuery.of(sheetContext).viewInsets.bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                quotedFinal == null
+                    ? '${service.name} — ${service.priceLabel}'
+                    : '${service.name} — ₹${(quotedFinal! / 100).toStringAsFixed(0)}',
+                style: Theme.of(sheetContext).textTheme.titleLarge,
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: note,
-              decoration: InputDecoration(
-                labelText: l10n.noteLabel,
-                border: const OutlineInputBorder(),
+              if (appliedCoupon != null)
+                Text(
+                  '${l10n.couponApplied}: $appliedCoupon',
+                  style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w600),
+                ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: address,
+                decoration: InputDecoration(
+                  labelText: l10n.addressLabel,
+                  border: const OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              style:
-                  FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              onPressed: () {
-                if (address.text.trim().length < 5) {
-                  ScaffoldMessenger.of(sheetContext).showSnackBar(
-                      SnackBar(content: Text(l10n.addressInvalid)));
-                  return;
-                }
-                Navigator.of(sheetContext).pop(true);
-              },
-              child: Text(l10n.confirmBooking),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: note,
+                decoration: InputDecoration(
+                  labelText: l10n.noteLabel,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: coupon,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: l10n.couponLabel,
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: () async {
+                      final code = coupon.text.trim();
+                      if (code.isEmpty) return;
+                      final sheetMessenger =
+                          ScaffoldMessenger.of(sheetContext);
+                      try {
+                        final quote =
+                            await repo.couponCheck(code, service.id);
+                        setState(() {
+                          quotedFinal = quote.finalPaise;
+                          appliedCoupon = code.toUpperCase();
+                        });
+                      } catch (e) {
+                        setState(() {
+                          quotedFinal = null;
+                          appliedCoupon = null;
+                        });
+                        sheetMessenger.showSnackBar(
+                            SnackBar(content: Text(apiErrorMessage(e))));
+                      }
+                    },
+                    child: Text(l10n.applyCoupon),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                icon: Icon(
+                  lat == null ? Icons.my_location : Icons.check_circle,
+                  size: 18,
+                  color: lat == null ? null : Colors.green,
+                ),
+                label: Text(
+                    lat == null ? l10n.attachLocation : l10n.locationAttached),
+                onPressed: () async {
+                  final sheetMessenger = ScaffoldMessenger.of(sheetContext);
+                  try {
+                    var permission = await Geolocator.checkPermission();
+                    if (permission == LocationPermission.denied) {
+                      permission = await Geolocator.requestPermission();
+                    }
+                    if (permission == LocationPermission.denied ||
+                        permission == LocationPermission.deniedForever) {
+                      sheetMessenger.showSnackBar(
+                          SnackBar(content: Text(l10n.locationFailed)));
+                      return;
+                    }
+                    final position = await Geolocator.getCurrentPosition(
+                      locationSettings: const LocationSettings(
+                        accuracy: LocationAccuracy.high,
+                        timeLimit: Duration(seconds: 15),
+                      ),
+                    );
+                    setState(() {
+                      lat = position.latitude;
+                      lng = position.longitude;
+                    });
+                  } catch (_) {
+                    sheetMessenger.showSnackBar(
+                        SnackBar(content: Text(l10n.locationFailed)));
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48)),
+                onPressed: () {
+                  if (address.text.trim().length < 5) {
+                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                        SnackBar(content: Text(l10n.addressInvalid)));
+                    return;
+                  }
+                  Navigator.of(sheetContext).pop(true);
+                },
+                child: Text(l10n.confirmBooking),
+              ),
+            ],
+          ),
         ),
       ),
     );
 
     if (booked != true) return;
     try {
-      await ref.read(bookingsRepositoryProvider).create(
-            serviceId: service.id,
-            address: address.text.trim(),
-            note: note.text.trim(),
-          );
+      await repo.create(
+        serviceId: service.id,
+        address: address.text.trim(),
+        note: note.text.trim(),
+        lat: lat,
+        lng: lng,
+        couponCode: appliedCoupon,
+      );
       messenger.showSnackBar(SnackBar(content: Text(l10n.bookingCreated)));
       ref.invalidate(myBookingsProvider);
       ref.read(currentTabProvider.notifier).state = 1; // Bookings tab

@@ -2,8 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/admin/presentation/admin_panel_screen.dart';
+import '../../features/admin/presentation/admin_tickets_screen.dart';
 import '../../features/admin/presentation/catalog_manager_screen.dart';
+import '../../features/admin/presentation/coupons_screen.dart';
 import '../../features/admin/presentation/worker_approvals_screen.dart';
+import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/jobs/presentation/earnings_screen.dart';
+import '../../features/support/presentation/my_tickets_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/catalog/presentation/services_screen.dart';
@@ -58,6 +63,29 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/catalog',
         builder: (context, state) => const CatalogManagerScreen(),
+      ),
+      GoRoute(
+        path: '/admin/tickets',
+        builder: (context, state) => const AdminTicketsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/coupons',
+        builder: (context, state) => const CouponsScreen(),
+      ),
+      GoRoute(
+        path: '/earnings',
+        builder: (context, state) => const EarningsScreen(),
+      ),
+      GoRoute(
+        path: '/tickets',
+        builder: (context, state) => const MyTicketsScreen(),
+      ),
+      GoRoute(
+        path: '/chat/:bookingId',
+        builder: (context, state) => ChatScreen(
+          bookingId: state.pathParameters['bookingId']!,
+          title: state.uri.queryParameters['title'] ?? 'Chat',
+        ),
       ),
     ],
   );

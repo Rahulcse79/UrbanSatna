@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_client.dart';
@@ -40,22 +41,24 @@ class JobsScreen extends ConsumerWidget {
               data: (e) => Card(
                 color: Theme.of(context).colorScheme.primaryContainer,
                 elevation: 0,
+                clipBehavior: Clip.antiAlias,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _Stat(label: l10n.earningsTitle, value: e.totalLabel),
-                      _Stat(
-                          label: l10n.completedJobs,
-                          value: '${e.completedJobs}'),
-                      _Stat(
-                        label: l10n.avgRating,
-                        value: e.avgRating?.toStringAsFixed(1) ?? '—',
-                      ),
-                    ],
+                child: InkWell(
+                  onTap: () => context.push('/earnings'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _Stat(label: l10n.todayLabel, value: e.todayLabel),
+                        _Stat(label: l10n.earningsTitle, value: e.totalLabel),
+                        _Stat(
+                            label: l10n.completedJobs,
+                            value: '${e.completedJobs}'),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -239,11 +242,19 @@ class _JobCard extends ConsumerWidget {
                   TextButton.icon(
                     icon: const Icon(Icons.directions, size: 18),
                     label: Text(l10n.navigateLabel),
+                    // GPS pin (when shared) beats the typed address.
                     onPressed: () => launchUrl(
-                      Uri.parse(
-                          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(job.address)}'),
+                      Uri.parse(job.lat != null && job.lng != null
+                          ? 'https://www.google.com/maps/dir/?api=1&destination=${job.lat},${job.lng}'
+                          : 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(job.address)}'),
                       mode: LaunchMode.externalApplication,
                     ),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                    label: Text(l10n.chatTitle),
+                    onPressed: () => context.push(
+                        '/chat/${job.id}?title=${Uri.encodeComponent(job.customerName ?? job.serviceName)}'),
                   ),
                 ],
               ),

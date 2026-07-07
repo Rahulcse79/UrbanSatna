@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_client.dart';
@@ -408,9 +409,35 @@ class _BookingCard extends ConsumerWidget {
                 child: Text('${l10n.cancelReasonTitle} ${booking.cancelReason}',
                     style: Theme.of(sheetContext).textTheme.bodySmall),
               ),
+            if (booking.discountPaise > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '${l10n.couponApplied} ${booking.couponCode ?? ''}: '
+                  '−${booking.discountLabel}',
+                  style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
             const SizedBox(height: 16),
             Row(
               children: [
+                if (booking.workerName != null &&
+                    booking.status != 'cancelled') ...[
+                  Expanded(
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                      label: Text(l10n.chatTitle),
+                      onPressed: () {
+                        Navigator.of(sheetContext).pop();
+                        context.push(
+                            '/chat/${booking.id}?title=${Uri.encodeComponent(booking.workerName!)}');
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 Expanded(
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.share, size: 18),
