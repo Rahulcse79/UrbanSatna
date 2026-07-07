@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/admin/presentation/admin_logs_screen.dart';
 import '../../features/admin/presentation/admin_panel_screen.dart';
 import '../../features/admin/presentation/admin_tickets_screen.dart';
+import '../../features/admin/presentation/admin_users_screen.dart';
 import '../../features/admin/presentation/catalog_manager_screen.dart';
 import '../../features/admin/presentation/coupons_screen.dart';
 import '../../features/admin/presentation/worker_approvals_screen.dart';
@@ -71,6 +73,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/coupons',
         builder: (context, state) => const CouponsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/users',
+        builder: (context, state) => const AdminUsersScreen(),
+      ),
+      GoRoute(
+        path: '/admin/logs',
+        builder: (context, state) => const AdminLogsScreen(),
       ),
       GoRoute(
         path: '/earnings',

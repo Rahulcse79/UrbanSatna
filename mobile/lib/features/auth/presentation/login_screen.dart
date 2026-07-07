@@ -6,6 +6,7 @@ import '../../../core/auth/auth_controller.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/config/server_url.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/brand_logo.dart';
 import '../../../l10n/gen/app_localizations.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -16,8 +17,9 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _phone = TextEditingController(text: '+91');
+  final _phone = TextEditingController();
   final _otp = TextEditingController();
+  String _countryCode = '+91';
   bool _otpSent = false;
   bool _busy = false;
 
@@ -28,11 +30,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  String get _fullPhone => '$_countryCode${_phone.text.trim()}';
+
   bool get _phoneValid {
     final p = _phone.text.trim();
-    return p.startsWith('+') &&
-        p.length >= 11 &&
-        p.substring(1).split('').every((c) => '0123456789'.contains(c));
+    return p.length == 10 && p.split('').every((c) => '0123456789'.contains(c));
   }
 
   Future<void> _sendOtp() async {
@@ -46,7 +48,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final devOtp = await ref
           .read(authControllerProvider.notifier)
-          .requestOtp(_phone.text.trim());
+          .requestOtp(_fullPhone);
       if (devOtp != null) _otp.text = devOtp; // dev backend returns the OTP
       setState(() => _otpSent = true);
     } catch (e) {
@@ -67,7 +69,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await ref
           .read(authControllerProvider.notifier)
-          .verifyOtp(_phone.text.trim(), _otp.text.trim());
+          .verifyOtp(_fullPhone, _otp.text.trim());
       // Router redirect takes over once tokens are set.
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
@@ -79,29 +81,79 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    // Country list is remote-config data: launch with +91 only, expand
+    // from the admin panel with zero app changes.
+    final codes = ref.watch(appConfigProvider).maybeWhen(
+        data: (c) => c.countryCodes, orElse: () => const ['+91']);
+    if (!codes.contains(_countryCode) && codes.isNotEmpty) {
+      _countryCode = codes.first;
+    }
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.appTitle)),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 24),
-            Text(
-              l10n.loginTitle,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _phone,
-              enabled: !_otpSent,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: l10n.phoneLabel,
-                hintText: '+919876543210',
-                border: const OutlineInputBorder(),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 24),
+              const Center(child: BrandLogo(size: 72)),
+              const SizedBox(height: 16),
+              Text(
+                l10n.loginTitle,
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
-            ),
+              const SizedBox(height: 4),
+              Text(
+                l10n.loginSubtitle,
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 96,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _countryCode,
+                      items: [
+                        for (final code in codes)
+                          DropdownMenuItem(value: code, child: Text(code)),
+                      ],
+                      onChanged: _otpSent
+                          ? null
+                          : (v) =>
+                              setState(() => _countryCode = v ?? '+91'),
+                      decoration: const InputDecoration(
+                          border: OutlineInputBorder()),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _phone,
+                      enabled: !_otpSent,
+                      keyboardType: TextInputType.phone,
+                      maxLength: 10,
+                      decoration: InputDecoration(
+                        labelText: l10n.phoneLabel,
+                        hintText: '9876543210',
+                        counterText: '',
+                        prefixIcon: const Icon(Icons.phone_android),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             if (_otpSent) ...[
               const SizedBox(height: 16),
               TextField(
@@ -139,9 +191,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         }),
                 child: Text(l10n.changePhone),
               ),
-            const Spacer(),
-            const _ServerUrlFooter(),
-          ],
+              const SizedBox(height: 40),
+              const _ServerUrlFooter(),
+            ],
+          ),
         ),
       ),
     );

@@ -39,6 +39,8 @@ class Ticket {
   final String? resolution;
 
   bool get open => status == 'open';
+  bool get resolved => status == 'resolved';
+  bool get closed => status == 'closed';
 }
 
 final ticketsRepositoryProvider = Provider<TicketsRepository>((ref) {
@@ -86,4 +88,10 @@ class TicketsRepository {
   Future<void> resolve(String id, String resolution) =>
       _dio.post('/api/v1/admin/tickets/$id/resolve',
           data: {'resolution': resolution});
+
+  Future<void> reopen(String id) =>
+      _dio.post('/api/v1/tickets/$id/reopen');
+
+  Future<void> close(String id) =>
+      _dio.post('/api/v1/admin/tickets/$id/close');
 }

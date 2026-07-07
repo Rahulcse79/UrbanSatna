@@ -100,6 +100,12 @@ class _ServiceTile extends ConsumerWidget {
     double? lng;
     int? quotedFinal;
     String? appliedCoupon;
+    // Valid offers for this user (active + never used) — the dropdown.
+    var offers = const <({String code, String label})>[];
+    try {
+      offers = await ref.read(availableCouponsProvider.future);
+    } catch (_) {}
+    if (!context.mounted) return;
 
     final booked = await showModalBottomSheet<bool>(
       context: context,
@@ -141,6 +147,45 @@ class _ServiceTile extends ConsumerWidget {
                   border: const OutlineInputBorder(),
                 ),
               ),
+              if (offers.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  hint: Text(l10n.selectOffer),
+                  items: [
+                    for (final offer in offers)
+                      DropdownMenuItem(
+                        value: offer.code,
+                        child: Text('${offer.code} — ${offer.label}'),
+                      ),
+                  ],
+                  onChanged: (code) async {
+                    if (code == null) return;
+                    coupon.text = code;
+                    final sheetMessenger = ScaffoldMessenger.of(sheetContext);
+                    try {
+                      final quote = await repo.couponCheck(code, service.id);
+                      setState(() {
+                        quotedFinal = quote.finalPaise;
+                        appliedCoupon = code;
+                      });
+                    } catch (e) {
+                      setState(() {
+                        quotedFinal = null;
+                        appliedCoupon = null;
+                      });
+                      sheetMessenger.showSnackBar(
+                          SnackBar(content: Text(apiErrorMessage(e))));
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: l10n.selectOffer,
+                    prefixIcon: const Icon(Icons.local_offer_outlined),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [

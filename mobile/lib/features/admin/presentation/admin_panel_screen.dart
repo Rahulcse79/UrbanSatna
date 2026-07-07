@@ -7,8 +7,15 @@ import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/gen/app_localizations.dart';
 
-/// Admin hub: runtime controls that apply to every user instantly
-/// (PRODUCT.md §6.5 — the control plane grows here).
+final adminStatsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  final dio = ref.watch(dioProvider);
+  final res = await dio.get<Map<String, dynamic>>('/api/v1/admin/stats');
+  return unwrapEnvelope(res) as Map<String, dynamic>;
+});
+
+/// Admin hub: live dashboard numbers + runtime controls that apply to
+/// every user instantly (PRODUCT.md §6.5 — the control plane).
 class AdminPanelScreen extends ConsumerWidget {
   const AdminPanelScreen({super.key});
 
@@ -38,11 +45,85 @@ class AdminPanelScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
+          Consumer(builder: (context, ref, _) {
+            final stats = ref.watch(adminStatsProvider).maybeWhen(
+                data: (s) => s, orElse: () => null);
+            if (stats == null) return const SizedBox.shrink();
+            String rupees(dynamic paise) =>
+                '₹${(((paise as int?) ?? 0) / 100).toStringAsFixed(0)}';
+            final tiles = <(String, String, IconData)>[
+              ('${stats['bookings_today'] ?? 0}', l10n.statBookingsToday,
+                  Icons.receipt_long),
+              (rupees(stats['revenue_today_paise']), l10n.statRevenueToday,
+                  Icons.currency_rupee),
+              ('${stats['active_bookings'] ?? 0}', l10n.statActive,
+                  Icons.pending_actions),
+              ('${stats['open_tickets'] ?? 0}', l10n.statOpenTickets,
+                  Icons.confirmation_number),
+              ('${stats['pending_applications'] ?? 0}', l10n.statPendingKyc,
+                  Icons.how_to_reg),
+              ('${stats['total_users'] ?? 0}', l10n.statUsers, Icons.group),
+            ];
+            final scheme = Theme.of(context).colorScheme;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.05,
+                children: [
+                  for (final (value, label, icon) in tiles)
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(icon, size: 18, color: scheme.primary),
+                          const SizedBox(height: 4),
+                          Text(value,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16)),
+                          Text(label,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                      color: scheme.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }),
           ListTile(
             leading: const Icon(Icons.how_to_reg),
             title: Text(l10n.workerApprovals),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/admin/approvals'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.group),
+            title: Text(l10n.usersAdmin),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/admin/users'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: Text(l10n.logsAdmin),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/admin/logs'),
           ),
           ListTile(
             leading: const Icon(Icons.category),

@@ -94,12 +94,38 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
                             const SizedBox(height: 8),
                         itemBuilder: (context, i) => TicketCard(
                           ticket: items[i],
-                          trailing: items[i].open
-                              ? FilledButton(
-                                  onPressed: () => _resolve(items[i]),
-                                  child: Text(l10n.resolveTicket),
-                                )
-                              : null,
+                          trailing: items[i].closed
+                              ? null
+                              : Wrap(
+                                  spacing: 8,
+                                  children: [
+                                    OutlinedButton(
+                                      onPressed: () async {
+                                        final messenger =
+                                            ScaffoldMessenger.of(context);
+                                        try {
+                                          await ref
+                                              .read(
+                                                  ticketsRepositoryProvider)
+                                              .close(items[i].id);
+                                          ref.invalidate(
+                                              adminTicketsProvider);
+                                        } catch (e) {
+                                          messenger.showSnackBar(SnackBar(
+                                              content: Text(
+                                                  apiErrorMessage(e))));
+                                        }
+                                      },
+                                      child: Text(l10n.closeTicket),
+                                    ),
+                                    if (items[i].open)
+                                      FilledButton(
+                                        onPressed: () =>
+                                            _resolve(items[i]),
+                                        child: Text(l10n.resolveTicket),
+                                      ),
+                                  ],
+                                ),
                         ),
                       ),
               ),

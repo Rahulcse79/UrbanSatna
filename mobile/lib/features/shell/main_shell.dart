@@ -6,10 +6,13 @@ import '../../l10n/gen/app_localizations.dart';
 import '../bookings/presentation/bookings_screen.dart';
 import '../home/presentation/home_screen.dart';
 import '../jobs/presentation/jobs_screen.dart';
+import '../profile/presentation/complete_profile_screen.dart';
 import '../profile/presentation/profile_screen.dart';
 import 'current_tab.dart';
 
 /// Bottom-navigation shell: Home · Bookings · Jobs (workers) · Profile.
+/// First login is gated: name/address/T&C must be completed before the
+/// tabs unlock (PRODUCT.md — real-world onboarding).
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
 
@@ -18,6 +21,13 @@ class MainShell extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final isWorker =
         ref.watch(authControllerProvider.select((t) => t?.isWorker ?? false));
+    final incomplete = ref.watch(meProvider).maybeWhen(
+        data: (me) =>
+            (me['full_name'] as String?)?.trim().isEmpty != false ||
+            (me['city'] as String?)?.trim().isEmpty != false ||
+            me['terms_accepted'] != true,
+        orElse: () => false); // fail-open while loading/offline
+    if (incomplete) return const CompleteProfileScreen();
     final pages = [
       const HomeScreen(),
       const BookingsScreen(),

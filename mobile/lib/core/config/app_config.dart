@@ -22,6 +22,11 @@ class AppConfig {
     this.bookingsPaused = false,
     this.bookingsPausedMessage,
     this.maxActiveBookings = 5,
+    this.supportEmail,
+    this.appVersionLabel,
+    this.countryCodes = const ['+91'],
+    this.termsUrl,
+    this.privacyUrl,
   });
 
   final bool allowServerUrlChange;
@@ -51,6 +56,13 @@ class AppConfig {
   final bool bookingsPaused;
   final String? bookingsPausedMessage;
   final int maxActiveBookings;
+
+  // Help, legal & registration
+  final String? supportEmail;
+  final String? appVersionLabel;
+  final List<String> countryCodes;
+  final String? termsUrl;
+  final String? privacyUrl;
 
   /// The build a device must have to pass the version gate.
   int get effectiveMinBuild =>
@@ -86,6 +98,14 @@ final appConfigProvider = FutureProvider.autoDispose<AppConfig>((ref) async {
       bookingsPaused: data['bookings_paused'] as bool? ?? false,
       bookingsPausedMessage: data['bookings_paused_message'] as String?,
       maxActiveBookings: data['max_active_bookings'] as int? ?? 5,
+      supportEmail: data['support_email'] as String?,
+      appVersionLabel: data['app_version_label'] as String?,
+      countryCodes: (data['country_codes'] as List<dynamic>?)
+              ?.cast<String>()
+              .toList() ??
+          const ['+91'],
+      termsUrl: data['terms_url'] as String?,
+      privacyUrl: data['privacy_url'] as String?,
     );
   } catch (_) {
     return const AppConfig(allowServerUrlChange: true);

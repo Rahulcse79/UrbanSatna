@@ -33,7 +33,30 @@ class MyTicketsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   itemCount: items.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) => TicketCard(ticket: items[i]),
+                  itemBuilder: (context, i) => TicketCard(
+                    ticket: items[i],
+                    // Reopen only while 'resolved' — a closed ticket is
+                    // the admin's final word.
+                    trailing: items[i].resolved
+                        ? OutlinedButton.icon(
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: Text(l10n.reopenTicket),
+                            onPressed: () async {
+                              final messenger =
+                                  ScaffoldMessenger.of(context);
+                              try {
+                                await ref
+                                    .read(ticketsRepositoryProvider)
+                                    .reopen(items[i].id);
+                                ref.invalidate(myTicketsProvider);
+                              } catch (e) {
+                                messenger.showSnackBar(SnackBar(
+                                    content: Text(apiErrorMessage(e))));
+                              }
+                            },
+                          )
+                        : null,
+                  ),
                 ),
         ),
       ),
@@ -68,12 +91,18 @@ class TicketCard extends StatelessWidget {
                           ?.copyWith(fontWeight: FontWeight.w600)),
                 ),
                 Chip(
-                  label: Text(
-                      ticket.open ? l10n.openLabel : l10n.resolvedLabel),
+                  label: Text(ticket.open
+                      ? l10n.openLabel
+                      : ticket.closed
+                          ? l10n.closedLabel
+                          : l10n.resolvedLabel),
                   labelStyle:
                       const TextStyle(color: Colors.white, fontSize: 12),
-                  backgroundColor:
-                      ticket.open ? Colors.orange : Colors.green,
+                  backgroundColor: ticket.open
+                      ? Colors.orange
+                      : ticket.closed
+                          ? Colors.grey
+                          : Colors.green,
                   visualDensity: VisualDensity.compact,
                 ),
               ],

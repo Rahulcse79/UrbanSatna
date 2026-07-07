@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/config/app_config.dart';
@@ -105,16 +106,28 @@ class ProfileScreen extends ConsumerWidget {
                   onTap: () => context.push('/admin'),
                 ),
               Consumer(builder: (context, ref, _) {
-                final supportPhone = ref.watch(appConfigProvider).maybeWhen(
-                    data: (c) => c.supportPhone, orElse: () => null);
-                if (supportPhone == null || supportPhone.isEmpty) {
-                  return const SizedBox.shrink();
-                }
-                return ListTile(
-                  leading: const Icon(Icons.support_agent),
-                  title: Text(l10n.helpSupport),
-                  subtitle: Text(supportPhone),
-                  onTap: () => callNumber(supportPhone),
+                final config = ref.watch(appConfigProvider).maybeWhen(
+                    data: (c) => c, orElse: () => null);
+                final phone = config?.supportPhone;
+                final email = config?.supportEmail;
+                return Column(
+                  children: [
+                    if (phone != null && phone.isNotEmpty)
+                      ListTile(
+                        leading: const Icon(Icons.support_agent),
+                        title: Text(l10n.helpSupport),
+                        subtitle: Text(phone),
+                        onTap: () => callNumber(phone),
+                      ),
+                    if (email != null && email.isNotEmpty)
+                      ListTile(
+                        leading: const Icon(Icons.alternate_email),
+                        title: Text(l10n.emailSupport),
+                        subtitle: Text(email),
+                        onTap: () =>
+                            launchUrl(Uri(scheme: 'mailto', path: email)),
+                      ),
+                  ],
                 );
               }),
               ListTile(

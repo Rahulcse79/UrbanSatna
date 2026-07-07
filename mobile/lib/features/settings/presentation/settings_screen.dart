@@ -126,12 +126,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
           const SizedBox(height: 24),
           Center(
-            child: Text(
-              'Servexa v0.1.${Env.appBuild}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-            ),
+            child: Builder(builder: (context) {
+              // Marketing version is admin-managed; build stays technical.
+              final label = ref.watch(appConfigProvider).maybeWhen(
+                  data: (c) => c.appVersionLabel, orElse: () => null);
+              return Text(
+                'Servexa ${label ?? 'v0.1.${Env.appBuild}'} · build ${Env.appBuild}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+              );
+            }),
           ),
           Consumer(
             builder: (context, ref, _) {

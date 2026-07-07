@@ -29,6 +29,21 @@ final workerHistoryProvider = FutureProvider.autoDispose<List<Booking>>((ref) {
   return ref.watch(bookingsRepositoryProvider).workerHistory();
 });
 
+/// Offers the signed-in user can still use (one use per user, forever).
+final availableCouponsProvider = FutureProvider.autoDispose<
+    List<({String code, String label})>>((ref) async {
+  final dio = ref.watch(dioProvider);
+  final res =
+      await dio.get<Map<String, dynamic>>('/api/v1/coupons/available');
+  return (unwrapEnvelope(res) as List<dynamic>).map((c) {
+    final coupon = c as Map<String, dynamic>;
+    final label = coupon['percent_off'] != null
+        ? '${coupon['percent_off']}% off'
+        : '₹${((coupon['flat_off_paise'] as int? ?? 0) / 100).toStringAsFixed(0)} off';
+    return (code: coupon['code'] as String, label: label);
+  }).toList();
+});
+
 class BookingsRepository {
   const BookingsRepository(this._dio);
 

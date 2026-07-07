@@ -151,7 +151,12 @@ class _ApplicationCard extends ConsumerWidget {
               Text('${l10n.experienceLabel}: ${application.experience}',
                   style: theme.textTheme.bodySmall),
             const SizedBox(height: 8),
-            Row(
+            // Wrap, not Row: four actions overflow narrow cards otherwise.
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (application.hasKycDoc)
                   TextButton.icon(
@@ -165,7 +170,6 @@ class _ApplicationCard extends ConsumerWidget {
                     label: Text(l10n.viewSelfie),
                     onPressed: () => _showKyc(context, ref, 'selfie'),
                   ),
-                const Spacer(),
                 TextButton(
                   onPressed: () => _decide(context, ref, approve: false),
                   child: Text(
@@ -173,7 +177,6 @@ class _ApplicationCard extends ConsumerWidget {
                     style: TextStyle(color: theme.colorScheme.error),
                   ),
                 ),
-                const SizedBox(width: 8),
                 FilledButton(
                   onPressed: () => _decide(context, ref, approve: true),
                   child: Text(l10n.approve),
