@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/soft_card.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../bookings/data/bookings_repository.dart';
 import '../../shell/current_tab.dart';
@@ -47,43 +48,78 @@ class _ServiceTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(service.name,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600)),
-                  if (service.description != null)
-                    Text(service.description!,
-                        style: Theme.of(context).textTheme.bodySmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${service.priceLabel} · ${service.durationMin} min',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ],
-              ),
+    final scheme = Theme.of(context).colorScheme;
+    return SoftCard(
+      onTap: () => _openBookingSheet(context, ref),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(14),
             ),
-            FilledButton(
-              onPressed: () => _openBookingSheet(context, ref),
-              child: Text(l10n.bookNow),
+            child: Icon(Icons.handyman_outlined,
+                color: scheme.onPrimaryContainer, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(service.name,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600)),
+                if (service.description != null)
+                  Text(service.description!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Text(service.priceLabel,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(
+                                color: scheme.primary,
+                                fontWeight: FontWeight.w800)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.schedule,
+                              size: 12, color: scheme.onSurfaceVariant),
+                          const SizedBox(width: 3),
+                          Text('${service.durationMin} min',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: scheme.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: () => _openBookingSheet(context, ref),
+            child: Text(l10n.bookNow),
+          ),
+        ],
       ),
     );
   }
@@ -136,7 +172,10 @@ class _ServiceTile extends ConsumerWidget {
                 controller: address,
                 decoration: InputDecoration(
                   labelText: l10n.addressLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
               const SizedBox(height: 12),
@@ -144,7 +183,10 @@ class _ServiceTile extends ConsumerWidget {
                 controller: note,
                 decoration: InputDecoration(
                   labelText: l10n.noteLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
               if (offers.isNotEmpty) ...[
@@ -181,7 +223,10 @@ class _ServiceTile extends ConsumerWidget {
                   decoration: InputDecoration(
                     labelText: l10n.selectOffer,
                     prefixIcon: const Icon(Icons.local_offer_outlined),
-                    border: const OutlineInputBorder(),
+                    filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                     isDense: true,
                   ),
                 ),
@@ -195,7 +240,10 @@ class _ServiceTile extends ConsumerWidget {
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
                         labelText: l10n.couponLabel,
-                        border: const OutlineInputBorder(),
+                        filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                         isDense: true,
                       ),
                     ),

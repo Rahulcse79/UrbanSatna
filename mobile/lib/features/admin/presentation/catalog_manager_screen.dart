@@ -130,7 +130,10 @@ class CatalogManagerScreen extends ConsumerWidget {
               controller: name,
               decoration: InputDecoration(
                 labelText: l10n.categoryNameLabel,
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 12),
@@ -139,7 +142,10 @@ class CatalogManagerScreen extends ConsumerWidget {
               decoration: InputDecoration(
                 labelText: l10n.iconKeyLabel,
                 helperText: 'electrician · plumber · ac · cleaning …',
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
           ],
@@ -272,7 +278,10 @@ class _CategoryTile extends ConsumerWidget {
                 controller: name,
                 decoration: InputDecoration(
                   labelText: l10n.serviceNameLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
               const SizedBox(height: 12),
@@ -281,7 +290,10 @@ class _CategoryTile extends ConsumerWidget {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: l10n.priceRupeesLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
               const SizedBox(height: 12),
@@ -290,7 +302,10 @@ class _CategoryTile extends ConsumerWidget {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: l10n.durationMinLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
               const SizedBox(height: 12),
@@ -298,7 +313,10 @@ class _CategoryTile extends ConsumerWidget {
                 controller: description,
                 decoration: InputDecoration(
                   labelText: l10n.descriptionLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
             ],

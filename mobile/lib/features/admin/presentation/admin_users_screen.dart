@@ -83,7 +83,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
             controller: controller,
             decoration: InputDecoration(
               labelText: l10n.blockReasonLabel,
-              border: const OutlineInputBorder(),
+              filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
             ),
           ),
           actions: [

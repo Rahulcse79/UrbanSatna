@@ -31,7 +31,10 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
           maxLines: 3,
           decoration: InputDecoration(
             labelText: l10n.resolutionLabel,
-            border: const OutlineInputBorder(),
+            filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
           ),
         ),
         actions: [

@@ -152,7 +152,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         hintText: '9876543210',
                         counterText: '',
                         prefixIcon: const Icon(Icons.phone_android),
-                        border: const OutlineInputBorder(),
+                        filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                       ),
                     ),
                   ),
@@ -166,7 +169,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 maxLength: 6,
                 decoration: InputDecoration(
                   labelText: l10n.otpLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                   counterText: '',
                 ),
               ),

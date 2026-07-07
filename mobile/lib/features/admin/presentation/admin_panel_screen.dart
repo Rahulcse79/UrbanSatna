@@ -51,19 +51,22 @@ class AdminPanelScreen extends ConsumerWidget {
             if (stats == null) return const SizedBox.shrink();
             String rupees(dynamic paise) =>
                 '₹${(((paise as int?) ?? 0) / 100).toStringAsFixed(0)}';
-            final tiles = <(String, String, IconData)>[
+            // Each metric gets its own color for at-a-glance scanning.
+            final tiles = <(String, String, IconData, MaterialColor)>[
               ('${stats['bookings_today'] ?? 0}', l10n.statBookingsToday,
-                  Icons.receipt_long),
+                  Icons.receipt_long, Colors.indigo),
               (rupees(stats['revenue_today_paise']), l10n.statRevenueToday,
-                  Icons.currency_rupee),
+                  Icons.currency_rupee, Colors.green),
               ('${stats['active_bookings'] ?? 0}', l10n.statActive,
-                  Icons.pending_actions),
+                  Icons.pending_actions, Colors.blue),
               ('${stats['open_tickets'] ?? 0}', l10n.statOpenTickets,
-                  Icons.confirmation_number),
+                  Icons.confirmation_number, Colors.orange),
               ('${stats['pending_applications'] ?? 0}', l10n.statPendingKyc,
-                  Icons.how_to_reg),
-              ('${stats['total_users'] ?? 0}', l10n.statUsers, Icons.group),
+                  Icons.how_to_reg, Colors.purple),
+              ('${stats['total_users'] ?? 0}', l10n.statUsers, Icons.group,
+                  Colors.teal),
             ];
+            final dark = Theme.of(context).brightness == Brightness.dark;
             final scheme = Theme.of(context).colorScheme;
             return Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
@@ -71,29 +74,40 @@ class AdminPanelScreen extends ConsumerWidget {
                 crossAxisCount: 3,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 1.05,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.0,
                 children: [
-                  for (final (value, label, icon) in tiles)
+                  for (final (value, label, icon, color) in tiles)
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(14),
+                        color: dark
+                            ? color.shade900.withValues(alpha: 0.32)
+                            : color.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                            color: color.withValues(alpha: 0.25)),
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(icon, size: 18, color: scheme.primary),
-                          const SizedBox(height: 4),
+                          Icon(icon,
+                              size: 20,
+                              color: dark
+                                  ? color.shade200
+                                  : color.shade700),
+                          const Spacer(),
                           Text(value,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16)),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18,
+                                  color: dark
+                                      ? color.shade100
+                                      : color.shade900)),
                           Text(label,
                               maxLines: 2,
-                              textAlign: TextAlign.center,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context)
                                   .textTheme
@@ -351,7 +365,10 @@ class AdminPanelScreen extends ConsumerWidget {
                     controller: controller,
                     decoration: InputDecoration(
                       labelText: label,
-                      border: const OutlineInputBorder(),
+                      filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                     ),
                   ),
                 ),
@@ -395,7 +412,10 @@ class AdminPanelScreen extends ConsumerWidget {
                 controller: text,
                 maxLines: 2,
                 decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                   labelText: l10n.announcementTitle,
                 ),
               ),
@@ -451,7 +471,10 @@ class AdminPanelScreen extends ConsumerWidget {
                 controller: message,
                 decoration: InputDecoration(
                   labelText: l10n.pausedMessageLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
               const SizedBox(height: 12),
@@ -460,7 +483,10 @@ class AdminPanelScreen extends ConsumerWidget {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: l10n.maxActiveLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
             ],
@@ -508,7 +534,10 @@ class AdminPanelScreen extends ConsumerWidget {
                 controller: title,
                 decoration: InputDecoration(
                   labelText: l10n.promoTitleLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
               const SizedBox(height: 12),
@@ -516,7 +545,10 @@ class AdminPanelScreen extends ConsumerWidget {
                 controller: subtitle,
                 decoration: InputDecoration(
                   labelText: l10n.promoSubtitleLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
               SwitchListTile(

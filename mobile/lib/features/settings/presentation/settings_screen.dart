@@ -110,7 +110,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       labelText: l10n.serverUrlLabel,
                       helperText: l10n.serverUrlHelp,
                       helperMaxLines: 2,
-                      border: const OutlineInputBorder(),
+                      filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                     ),
                     validator: _validateUrl,
                     onFieldSubmitted: (_) => _save(),

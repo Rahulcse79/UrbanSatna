@@ -377,7 +377,19 @@ class _CategoryTile extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(categoryIcon(category.icon), size: 30, color: fg),
+              // White icon chip lifts the glyph off the tinted tile.
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface.withValues(
+                      alpha: Theme.of(context).brightness == Brightness.dark
+                          ? 0.18
+                          : 0.7),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(categoryIcon(category.icon), size: 24, color: fg),
+              ),
               const SizedBox(height: 8),
               Text(
                 category.name,

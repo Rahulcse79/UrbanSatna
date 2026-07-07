@@ -44,9 +44,15 @@ abstract final class AppTheme {
     final text = GoogleFonts.interTextTheme(base.textTheme);
     final headingFamily = GoogleFonts.poppins().fontFamily;
     return base.copyWith(
+      scaffoldBackgroundColor: scheme.surface,
+      // iOS-style slide transitions everywhere: premium navigation feel.
+      pageTransitionsTheme: const PageTransitionsTheme(builders: {
+        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      }),
       textTheme: text.copyWith(
         headlineSmall: text.headlineSmall?.copyWith(
-            fontFamily: headingFamily, fontWeight: FontWeight.w600),
+            fontFamily: headingFamily, fontWeight: FontWeight.w700),
         titleLarge: text.titleLarge?.copyWith(
             fontFamily: headingFamily, fontWeight: FontWeight.w600),
         titleMedium: text.titleMedium?.copyWith(fontFamily: headingFamily),
@@ -54,23 +60,51 @@ abstract final class AppTheme {
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
+        scrolledUnderElevation: 0,
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
         titleTextStyle: text.titleLarge?.copyWith(
           fontFamily: headingFamily,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
+          fontSize: 20,
           color: scheme.onSurface,
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          elevation: 0,
           shape: const StadiumBorder(),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          side: BorderSide(color: scheme.outlineVariant),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          textStyle: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surface,
         indicatorColor: scheme.primaryContainer,
+        elevation: 0,
+        labelTextStyle: WidgetStatePropertyAll(
+          text.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

@@ -154,7 +154,10 @@ class _CompleteProfileScreenState
               decoration: InputDecoration(
                 labelText: l10n.nameLabel,
                 prefixIcon: const Icon(Icons.person_outline),
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 14),
@@ -163,7 +166,10 @@ class _CompleteProfileScreenState
               decoration: InputDecoration(
                 labelText: l10n.addressLabel,
                 prefixIcon: const Icon(Icons.home_outlined),
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 14),
@@ -181,7 +187,10 @@ class _CompleteProfileScreenState
               decoration: InputDecoration(
                 labelText: l10n.stateLabel,
                 prefixIcon: const Icon(Icons.map_outlined),
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 14),
@@ -202,7 +211,10 @@ class _CompleteProfileScreenState
               decoration: InputDecoration(
                 labelText: l10n.cityFieldLabel,
                 prefixIcon: const Icon(Icons.location_city_outlined),
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
             if (_city == _otherCity) ...[
@@ -212,7 +224,10 @@ class _CompleteProfileScreenState
                 textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
                   labelText: l10n.cityManualLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
             ],
@@ -225,7 +240,10 @@ class _CompleteProfileScreenState
                 labelText: l10n.pincodeLabel,
                 counterText: '',
                 prefixIcon: const Icon(Icons.pin_drop_outlined),
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 14),

@@ -199,7 +199,10 @@ class ProfileScreen extends ConsumerWidget {
               controller: subject,
               decoration: InputDecoration(
                 labelText: l10n.subjectLabel,
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 12),
@@ -208,7 +211,10 @@ class ProfileScreen extends ConsumerWidget {
               maxLines: 3,
               decoration: InputDecoration(
                 labelText: l10n.messageLabel,
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
           ],
@@ -251,7 +257,10 @@ class ProfileScreen extends ConsumerWidget {
           controller: controller,
           decoration: InputDecoration(
             labelText: l10n.nameLabel,
-            border: const OutlineInputBorder(),
+            filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
           ),
         ),
         actions: [
@@ -481,7 +490,10 @@ class _WorkerApplicationTile extends ConsumerWidget {
               controller: skills,
               decoration: InputDecoration(
                 labelText: l10n.skillsLabel,
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 12),
@@ -489,7 +501,10 @@ class _WorkerApplicationTile extends ConsumerWidget {
               controller: experience,
               decoration: InputDecoration(
                 labelText: l10n.experienceLabel,
-                border: const OutlineInputBorder(),
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
               ),
             ),
           ],

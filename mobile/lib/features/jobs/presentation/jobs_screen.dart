@@ -8,7 +8,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../bookings/data/bookings_repository.dart';
 import '../../bookings/domain/booking.dart';
 import '../../bookings/presentation/bookings_screen.dart'
-    show callNumber, statusColor, statusLabel;
+    show callNumber, statusChip;
 
 /// Worker view: earnings, available jobs to accept, and assigned jobs
 /// to advance (mockup "Available Jobs" screen).
@@ -38,30 +38,41 @@ class JobsScreen extends ConsumerWidget {
             earnings.when(
               loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),
-              data: (e) => Card(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                elevation: 0,
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-                child: InkWell(
+              // Wallet-style gradient card — the worker's money at a glance.
+              data: (e) {
+                final primary = Theme.of(context).colorScheme.primary;
+                return InkWell(
+                  borderRadius: BorderRadius.circular(20),
                   onTap: () => context.push('/earnings'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          primary,
+                          Color.lerp(primary, Colors.black, 0.35) ?? primary,
+                        ],
+                      ),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _Stat(label: l10n.todayLabel, value: e.todayLabel),
-                        _Stat(label: l10n.earningsTitle, value: e.totalLabel),
+                        _Stat(
+                            label: l10n.earningsTitle, value: e.totalLabel),
                         _Stat(
                             label: l10n.completedJobs,
                             value: '${e.completedJobs}'),
-                        const Icon(Icons.chevron_right),
+                        const Icon(Icons.chevron_right,
+                            color: Colors.white70),
                       ],
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
             const SizedBox(height: 16),
             Text(l10n.myJobs,
@@ -129,11 +140,13 @@ class _Stat extends StatelessWidget {
     return Column(
       children: [
         Text(value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800, color: Colors.white)),
+        Text(label,
             style: Theme.of(context)
                 .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold)),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
+                .bodySmall
+                ?.copyWith(color: Colors.white70)),
       ],
     );
   }
@@ -176,7 +189,10 @@ class _JobCard extends ConsumerWidget {
           style: const TextStyle(fontSize: 24, letterSpacing: 8),
           decoration: InputDecoration(
             helperText: l10n.enterOtpHint,
-            border: const OutlineInputBorder(),
+            filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
             counterText: '',
           ),
         ),
@@ -219,14 +235,7 @@ class _JobCard extends ConsumerWidget {
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
-                if (assigned)
-                  Chip(
-                    label: Text(statusLabel(l10n, job.status)),
-                    labelStyle:
-                        const TextStyle(color: Colors.white, fontSize: 12),
-                    backgroundColor: statusColor(context, job.status),
-                    visualDensity: VisualDensity.compact,
-                  ),
+                if (assigned) statusChip(context, l10n, job.status),
               ],
             ),
             Text(job.address, style: Theme.of(context).textTheme.bodySmall),

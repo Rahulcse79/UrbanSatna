@@ -12,6 +12,24 @@ import '../domain/booking.dart';
 Future<void> callNumber(String phone) =>
     launchUrl(Uri(scheme: 'tel', path: phone));
 
+/// Modern status pill: soft tinted background + bold colored label
+/// (replaces the heavy solid Chip everywhere).
+Widget statusChip(BuildContext context, AppLocalizations l10n, String status) {
+  final color = statusColor(context, status);
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.16),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      statusLabel(l10n, status),
+      style: TextStyle(
+          color: color, fontSize: 12, fontWeight: FontWeight.w700),
+    ),
+  );
+}
+
 String _two(int n) => n < 10 ? '0$n' : '$n';
 
 String formatTime(DateTime t) =>
@@ -82,12 +100,27 @@ class _BookingsList extends ConsumerWidget {
         child: items.isEmpty
             ? ListView(
                 children: [
-                  const SizedBox(height: 120),
-                  Icon(Icons.receipt_long,
-                      size: 56,
-                      color: Theme.of(context).colorScheme.outline),
-                  const SizedBox(height: 12),
-                  Center(child: Text(l10n.noBookings)),
+                  const SizedBox(height: 100),
+                  Center(
+                    child: Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.receipt_long_outlined,
+                          size: 44,
+                          color: Theme.of(context).colorScheme.primary),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(l10n.noBookings,
+                        style: Theme.of(context).textTheme.titleMedium),
+                  ),
                 ],
               )
             : ListView.separated(
@@ -216,12 +249,7 @@ class _BookingCard extends ConsumerWidget {
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
-                Chip(
-                  label: Text(statusLabel(l10n, booking.status)),
-                  labelStyle: const TextStyle(color: Colors.white, fontSize: 12),
-                  backgroundColor: statusColor(context, booking.status),
-                  visualDensity: VisualDensity.compact,
-                ),
+                statusChip(context, l10n, booking.status),
               ],
             ),
             if (booking.workerName != null)
@@ -520,7 +548,10 @@ class _BookingCard extends ConsumerWidget {
                 controller: review,
                 decoration: InputDecoration(
                   labelText: l10n.reviewLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
             ],

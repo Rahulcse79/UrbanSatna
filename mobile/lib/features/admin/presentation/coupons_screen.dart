@@ -123,7 +123,10 @@ class CouponsScreen extends ConsumerWidget {
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
                   labelText: l10n.couponLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
               const SizedBox(height: 12),
@@ -142,7 +145,10 @@ class CouponsScreen extends ConsumerWidget {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: isPercent ? '% (1-90)' : l10n.priceRupeesLabel,
-                  border: const OutlineInputBorder(),
+                  filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
                 ),
               ),
             ],

@@ -70,7 +70,10 @@ class _ApplicationCard extends ConsumerWidget {
             controller: controller,
             decoration: InputDecoration(
               labelText: l10n.decisionNoteLabel,
-              border: const OutlineInputBorder(),
+              filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none),
             ),
           ),
           actions: [
