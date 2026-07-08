@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/pagination_bar.dart';
 import '../../../core/widgets/soft_card.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../bookings/data/bookings_repository.dart';
@@ -11,7 +12,9 @@ import '../../shell/current_tab.dart';
 import '../data/catalog_repository.dart';
 import '../domain/models.dart';
 
-class ServicesScreen extends ConsumerWidget {
+/// Explore a category: 10 services per page, Previous/Next paging —
+/// each page is one 10-row API request.
+class ServicesScreen extends ConsumerStatefulWidget {
   const ServicesScreen({
     super.key,
     required this.categoryId,
@@ -22,19 +25,37 @@ class ServicesScreen extends ConsumerWidget {
   final String categoryName;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final services = ref.watch(servicesProvider(categoryId));
+  ConsumerState<ServicesScreen> createState() => _ServicesScreenState();
+}
+
+class _ServicesScreenState extends ConsumerState<ServicesScreen> {
+  int _page = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    final services = ref.watch(
+        servicesProvider((categoryId: widget.categoryId, page: _page)));
     return Scaffold(
-      appBar: AppBar(title: Text(categoryName)),
+      appBar: AppBar(title: Text(widget.categoryName)),
       body: services.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text(apiErrorMessage(e))),
-        data: (items) => ListView.separated(
+        data: (page) => ListView.separated(
           padding: const EdgeInsets.all(16),
-          itemCount: items.length,
+          itemCount: page.items.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (context, i) => _ServiceTile(service: items[i]),
+          itemBuilder: (context, i) => _ServiceTile(service: page.items[i]),
         ),
+      ),
+      bottomNavigationBar: services.maybeWhen(
+        data: (page) => page.totalPages > 1
+            ? PaginationBar(
+                page: _page,
+                totalPages: page.totalPages,
+                onPage: (p) => setState(() => _page = p),
+              )
+            : null,
+        orElse: () => null,
       ),
     );
   }

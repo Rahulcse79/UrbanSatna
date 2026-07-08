@@ -65,7 +65,8 @@ pub struct SupportThread {
     pub awaiting_reply: bool,
 }
 
-/// Inbox: every conversation, most recently active first.
+/// Inbox: every customer conversation, most recently active first.
+/// Admin accounts never appear — support chat is staff → customer only.
 pub async fn threads(pg: &PgPool) -> Result<Vec<SupportThread>, AppError> {
     Ok(sqlx::query_as::<_, SupportThread>(
         "SELECT * FROM (
@@ -75,6 +76,11 @@ pub async fn threads(pg: &PgPool) -> Result<Vec<SupportThread>, AppError> {
                    (m.sender_id = m.user_id) AS awaiting_reply
             FROM support_messages m
             JOIN users u ON u.id = m.user_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM user_roles ur
+                JOIN roles r ON r.id = ur.role_id
+                WHERE ur.user_id = m.user_id
+                  AND r.name IN ('admin', 'super_admin'))
             ORDER BY m.user_id, m.created_at DESC
          ) t ORDER BY t.last_at DESC LIMIT 50",
     )

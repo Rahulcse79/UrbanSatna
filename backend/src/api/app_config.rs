@@ -31,6 +31,8 @@ const COUNTRY_CODES: &str = "country_codes";
 const TERMS_URL: &str = "terms_url";
 const PRIVACY_URL: &str = "privacy_url";
 const SUPPORT_ONLINE: &str = "support_online";
+const USER_POLICY_TEXT: &str = "user_policy_text";
+const ACCEPTANCE_TEXT: &str = "acceptance_text";
 
 /// The app falls back to its built-in look for unknown presets, so this
 /// list only guards against typos, not app versions.
@@ -83,6 +85,10 @@ pub struct AppConfig {
     pub privacy_url: Option<String>,
     /// Live-support indicator: green (true) / red (false) in the app.
     pub support_online: bool,
+    /// Admin-written User Policy body shown in the app (null = URL only).
+    pub user_policy_text: Option<String>,
+    /// Admin-written acceptance line ("I agree to …") on registration.
+    pub acceptance_text: Option<String>,
 }
 
 async fn load(state: &AppState) -> Result<AppConfig, AppError> {
@@ -167,6 +173,8 @@ async fn load(state: &AppState) -> Result<AppConfig, AppError> {
             .await?
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
+        user_policy_text: get_str(state, USER_POLICY_TEXT).await?,
+        acceptance_text: get_str(state, ACCEPTANCE_TEXT).await?,
     })
 }
 
@@ -203,6 +211,8 @@ pub struct UpdateAppConfig {
     pub terms_url: Option<String>,
     pub privacy_url: Option<String>,
     pub support_online: Option<bool>,
+    pub user_policy_text: Option<String>,
+    pub acceptance_text: Option<String>,
 }
 
 /// Admin: toggle app behavior at runtime (perm settings:manage).
@@ -273,6 +283,8 @@ pub async fn update(
         (COUNTRY_CODES, &body.country_codes),
         (TERMS_URL, &body.terms_url),
         (PRIVACY_URL, &body.privacy_url),
+        (USER_POLICY_TEXT, &body.user_policy_text),
+        (ACCEPTANCE_TEXT, &body.acceptance_text),
     ] {
         if let Some(text) = value {
             settings::set_json(&state.pg, key, json!(text.trim())).await?;

@@ -18,12 +18,28 @@ pub async fn list_categories(
     )))
 }
 
+#[derive(Deserialize)]
+pub struct PageQuery {
+    #[serde(default)]
+    pub page: Option<i64>,
+}
+
+fn page_meta(page: i64, total: i64) -> serde_json::Value {
+    json!({ "page": page, "per_page": catalog::PAGE_SIZE, "total": total })
+}
+
+/// Explore listing: exactly one 10-row page per request (meta.total
+/// lets the client render Next/Previous).
 pub async fn list_services(
     State(state): State<AppState>,
     Path(category_id): Path<Uuid>,
+    Query(q): Query<PageQuery>,
 ) -> Result<Json<ApiResponse<Vec<catalog::Service>>>, AppError> {
-    Ok(Json(ApiResponse::ok(
-        catalog::list_services(&state.pg, category_id).await?,
+    let page = q.page.unwrap_or(1).max(1);
+    let (items, total) = catalog::list_services(&state.pg, category_id, page).await?;
+    Ok(Json(ApiResponse::ok_with_meta(
+        items,
+        page_meta(page, total),
     )))
 }
 
@@ -33,20 +49,26 @@ pub struct SearchQuery {
     pub q: Option<String>,
     #[serde(default)]
     pub max_price_paise: Option<i64>,
+    #[serde(default)]
+    pub page: Option<i64>,
 }
 
-/// Public advanced search across all services.
+/// Public advanced search across all services, 10 results per page.
 pub async fn search(
     State(state): State<AppState>,
     Query(query): Query<SearchQuery>,
 ) -> Result<Json<ApiResponse<Vec<catalog::SearchResult>>>, AppError> {
-    Ok(Json(ApiResponse::ok(
-        catalog::search(
-            &state.pg,
-            query.q.unwrap_or_default().trim(),
-            query.max_price_paise,
-        )
-        .await?,
+    let page = query.page.unwrap_or(1).max(1);
+    let (items, total) = catalog::search(
+        &state.pg,
+        query.q.unwrap_or_default().trim(),
+        query.max_price_paise,
+        page,
+    )
+    .await?;
+    Ok(Json(ApiResponse::ok_with_meta(
+        items,
+        page_meta(page, total),
     )))
 }
 

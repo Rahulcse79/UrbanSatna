@@ -248,5 +248,13 @@
   "serverLabelShort": "Server",
   "save": "Save",
   "resetToDefault": "Reset to default",
-  "setServerUrl": "Set server URL"
+  "setServerUrl": "Set server URL",
+  "previousLabel": "Previous",
+  "userPolicyTitle": "User Policy",
+  "policyTextLabel": "Policy content",
+  "acceptanceTextLabel": "Acceptance line",
+  "chatbotLabel": "Chatbot",
+  "botActive": "Bot is answering (team offline)",
+  "botIdle": "Bot idle (team online)",
+  "closeLabel": "Close"
 }

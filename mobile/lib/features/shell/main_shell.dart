@@ -19,8 +19,8 @@ class MainShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final isWorker =
-        ref.watch(authControllerProvider.select((t) => t?.isWorker ?? false));
+    final isWorker = ref.watch(
+        authControllerProvider.select((t) => t?.isServiceman ?? false));
     final incomplete = ref.watch(meProvider).maybeWhen(
         data: (me) =>
             (me['full_name'] as String?)?.trim().isEmpty != false ||

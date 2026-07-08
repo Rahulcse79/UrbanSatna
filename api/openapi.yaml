@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Servexa API (UrbanSatna platform)
-  version: 0.4.0
+  version: 0.5.0
   description: |
     Service marketplace API. Source of truth for the REST contract.
     Every response uses the envelope `{ success, data, error, meta }`;
@@ -12,6 +12,10 @@ info:
 
     Auth: Bearer JWT access token (15 min) + rotating opaque refresh
     token (30 days). Roles/permissions are embedded in the JWT.
+    Exactly three fixed roles: customer | serviceman | admin.
+
+    Paginated explore lists (services by category, search) return one
+    10-row page per request with `meta: {page, per_page, total}`.
 
 servers:
   - url: http://localhost:8080
@@ -48,7 +52,8 @@ paths:
         latest_build, require_latest, city_label?, app_display_name?,
         tagline?, theme_preset, support_phone?, announcement_enabled,
         announcement_text?, bookings_paused, bookings_paused_message?,
-        max_active_bookings}. Version gate: app is blocked when
+        max_active_bookings, user_policy_text?, acceptance_text?,
+        support_online}. Version gate: app is blocked when
         build < min_build, or build < latest_build while require_latest.
         theme_preset ∈ indigo|emerald|crimson|royal|ocean|sunset|teal|gold|rose.
       responses: { "200": { description: config } }
@@ -162,9 +167,25 @@ paths:
   /api/v1/categories/{id}/services:
     get:
       tags: [catalog]
-      summary: Active services of a category (public)
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { "200": { description: "[{id,name,description,base_price_paise,duration_min}]" } }
+      summary: >-
+        Active services of a category (public), 10 per page —
+        meta: {page, per_page: 10, total}
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+      responses: { "200": { description: "[{id,name,description,base_price_paise,duration_min}] + meta" } }
+  /api/v1/services/search:
+    get:
+      tags: [catalog]
+      summary: >-
+        Public search across service name/description/category with an
+        optional price ceiling; 10 results per page, cheapest first —
+        meta: {page, per_page: 10, total}
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: max_price_paise, in: query, schema: { type: integer, format: int64 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+      responses: { "200": { description: "[SearchResult] + meta" } }
   /api/v1/categories/{id}:
     patch:
       tags: [catalog]
@@ -238,7 +259,7 @@ paths:
     get:
       tags: [jobs]
       security: [{ bearerAuth: [] }]
-      summary: Unassigned pending jobs (role worker)
+      summary: Unassigned pending jobs (role serviceman)
       responses: { "200": { description: "[Booking]" } }
   /api/v1/jobs/mine:
     get:
@@ -321,14 +342,64 @@ paths:
     get:
       tags: [admin]
       security: [{ bearerAuth: [] }]
-      summary: Support queue ?status=open(default)|resolved (perm bookings:manage:any)
-      responses: { "200": { description: "[Ticket]" } }
+      summary: >-
+        Support queue ?status=open(default)|resolved|closed&page=1
+        (perm bookings:manage:any). Returns a paginated object
+        {items: [Ticket], total, page, per_page: 10} — NOT a bare list.
+      responses: { "200": { description: "{items, total, page, per_page}" } }
   /api/v1/admin/tickets/{id}/resolve:
     post:
       tags: [admin]
       security: [{ bearerAuth: [] }]
       summary: "Resolve a ticket {resolution} (audited; once only)"
       responses: { "200": { description: Ticket }, "409": { description: already resolved } }
+  /api/v1/admin/tickets/{id}/close:
+    post:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Permanently close a ticket; the customer cannot reopen it
+      responses: { "200": { description: Ticket }, "409": { description: already closed } }
+  /api/v1/tickets/{id}/reopen:
+    post:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: Customer reopens their resolved (not closed) ticket
+      responses: { "200": { description: Ticket }, "409": { description: CONFLICT } }
+
+  /api/v1/support/messages:
+    get:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: My live-support thread (bot answers while support_online=false)
+      responses: { "200": { description: "[SupportMessage]" } }
+    post:
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      summary: "Send a support message {body ≤ 2000 chars}"
+      responses: { "200": { description: SupportMessage } }
+  /api/v1/admin/support/threads:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: >-
+        Support inbox, one row per customer conversation (perm
+        bookings:manage:any). Admin accounts never appear here.
+      responses: { "200": { description: "[SupportThread]" } }
+  /api/v1/admin/support/{user_id}/messages:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: Read a customer's support thread
+      parameters: [{ name: user_id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: "[SupportMessage]" } }
+    post:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: >-
+        Staff reply {body}. Support chat is staff → customer only:
+        replying to another admin account returns 409 CONFLICT.
+      parameters: [{ name: user_id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: SupportMessage }, "409": { description: target is an admin } }
 
   /api/v1/admin/worker-applications:
     get:
@@ -340,7 +411,7 @@ paths:
     post:
       tags: [admin]
       security: [{ bearerAuth: [] }]
-      summary: "Approve/reject: {approve: bool, note?}. Approval grants the worker role atomically."
+      summary: "Approve/reject: {approve: bool, note?}. Approval grants the serviceman role atomically."
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { "200": { description: decided }, "409": { description: already decided } }
   /api/v1/admin/worker-applications/{id}/kyc/{kind}:

@@ -17,7 +17,10 @@ class AuthTokens {
   final String refresh;
   final List<String> roles;
 
-  bool get isWorker => roles.contains('worker');
+  /// 'worker' is the pre-rename role name — accepted so tokens stored
+  /// before the serviceman migration keep working until the next refresh.
+  bool get isServiceman =>
+      roles.contains('serviceman') || roles.contains('worker');
 }
 
 const _storage = FlutterSecureStorage();

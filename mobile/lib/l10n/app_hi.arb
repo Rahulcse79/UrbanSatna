@@ -248,5 +248,13 @@
   "serverLabelShort": "सर्वर",
   "save": "सहेजें",
   "resetToDefault": "डिफ़ॉल्ट पर रीसेट करें",
-  "setServerUrl": "सर्वर URL सेट करें"
+  "setServerUrl": "सर्वर URL सेट करें",
+  "previousLabel": "पिछला",
+  "userPolicyTitle": "उपयोगकर्ता नीति",
+  "policyTextLabel": "नीति सामग्री",
+  "acceptanceTextLabel": "स्वीकृति पंक्ति",
+  "chatbotLabel": "चैटबॉट",
+  "botActive": "बॉट जवाब दे रहा है (टीम ऑफ़लाइन)",
+  "botIdle": "बॉट निष्क्रिय (टीम ऑनलाइन)",
+  "closeLabel": "बंद करें"
 }
