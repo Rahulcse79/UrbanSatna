@@ -42,16 +42,16 @@ pub async fn apply(
     .bind(user_id)
     .fetch_all(pg)
     .await?;
-    if roles.iter().any(|r| r == "serviceman") {
+    if roles.iter().any(|r| r == "worker") {
         return Err(AppError::Conflict(
-            "you are already a verified serviceman".into(),
+            "you are already a verified worker".into(),
         ));
     }
     // Separation of duties: staff accounts operate the platform, they
     // don't participate in the marketplace (PRODUCT.md role matrix).
-    if roles.iter().any(|r| r == "admin") {
+    if roles.iter().any(|r| r == "admin" || r == "super_admin") {
         return Err(AppError::Conflict(
-            "admin accounts cannot become servicemen".into(),
+            "admin accounts cannot become workers".into(),
         ));
     }
     let id = Uuid::now_v7();
@@ -157,8 +157,8 @@ pub async fn kyc_image(
     })
 }
 
-/// Approve/reject in one transaction: approval also grants the serviceman
-/// role, so the role can never exist without a decided application behind it.
+/// Approve/reject in one transaction: approval also grants the worker role,
+/// so the role can never exist without a decided application behind it.
 pub async fn decide(
     pg: &PgPool,
     id: Uuid,
@@ -186,7 +186,7 @@ pub async fn decide(
         sqlx::query(
             "INSERT INTO user_roles (user_id, role_id)
              SELECT a.user_id, r.id FROM worker_applications a, roles r
-             WHERE a.id = $1 AND r.name = 'serviceman'
+             WHERE a.id = $1 AND r.name = 'worker'
              ON CONFLICT DO NOTHING",
         )
         .bind(id)

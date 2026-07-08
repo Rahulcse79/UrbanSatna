@@ -57,33 +57,6 @@ class _CompleteProfileScreenState
   bool _termsAccepted = false;
   bool _busy = false;
 
-  /// Shows the admin-written policy in-app; falls back to the terms URL
-  /// when the admin has not written one.
-  void _showPolicy(BuildContext context, AppConfig? config) {
-    final l10n = AppLocalizations.of(context);
-    final text = config?.userPolicyText;
-    if (text == null || text.isEmpty) {
-      launchUrl(
-          Uri.parse(
-              config?.termsUrl ?? 'https://urbansatna.onrender.com/terms'),
-          mode: LaunchMode.externalApplication);
-      return;
-    }
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.userPolicyTitle),
-        content: SingleChildScrollView(child: Text(text)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(l10n.closeLabel),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _requestLocation() async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
@@ -294,17 +267,8 @@ class _CompleteProfileScreenState
               title: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  // Admin-written acceptance line wins over the built-in copy.
-                  Text(config?.acceptanceText ?? l10n.agreeToTerms,
+                  Text(l10n.agreeToTerms,
                       style: Theme.of(context).textTheme.bodySmall),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                    onPressed: () => _showPolicy(context, config),
-                    child: Text(l10n.userPolicyTitle),
-                  ),
                   TextButton(
                     style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 4),

@@ -45,7 +45,7 @@ class ProfileScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final me = ref.watch(meProvider);
     final tokens = ref.watch(authControllerProvider);
-    final isWorker = tokens?.isServiceman ?? false;
+    final isWorker = tokens?.isWorker ?? false;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.navProfile)),

@@ -82,17 +82,8 @@ class TicketsRepository {
   Future<List<Ticket>> mine() async =>
       _list(await _dio.get<Map<String, dynamic>>('/api/v1/tickets/mine'));
 
-  /// Admin queue returns a paginated object `{items, total, page,
-  /// per_page}`, not a bare list — parse `items` (fixes tickets being
-  /// invisible in the admin account).
-  Future<List<Ticket>> adminQueue(String status, {int page = 1}) async {
-    final res = await _dio.get<Map<String, dynamic>>(
-        '/api/v1/admin/tickets?status=$status&page=$page');
-    final data = unwrapEnvelope(res) as Map<String, dynamic>;
-    return (data['items'] as List<dynamic>)
-        .map((t) => Ticket.fromJson(t as Map<String, dynamic>))
-        .toList();
-  }
+  Future<List<Ticket>> adminQueue(String status) async => _list(await _dio
+      .get<Map<String, dynamic>>('/api/v1/admin/tickets?status=$status'));
 
   Future<void> resolve(String id, String resolution) =>
       _dio.post('/api/v1/admin/tickets/$id/resolve',

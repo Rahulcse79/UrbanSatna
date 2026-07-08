@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_client.dart';
-import '../../../core/widgets/pagination_bar.dart';
 import '../../../l10n/gen/app_localizations.dart';
 
 class SearchService {
@@ -38,29 +37,19 @@ class SearchService {
   String get priceLabel => '₹${(pricePaise / 100).toStringAsFixed(0)}';
 }
 
-typedef SearchArgs = ({String q, int? maxPricePaise, int page});
-
-typedef SearchPage = ({List<SearchService> items, int totalPages});
+typedef SearchArgs = ({String q, int? maxPricePaise});
 
 final serviceSearchProvider = FutureProvider.autoDispose
-    .family<SearchPage, SearchArgs>((ref, args) async {
+    .family<List<SearchService>, SearchArgs>((ref, args) async {
   final dio = ref.watch(dioProvider);
   final maxPrice = args.maxPricePaise != null
       ? '&max_price_paise=${args.maxPricePaise}'
       : '';
   final res = await dio.get<Map<String, dynamic>>(
-      '/api/v1/services/search?q=${Uri.encodeComponent(args.q)}'
-      '$maxPrice&page=${args.page}');
-  final items = (unwrapEnvelope(res) as List<dynamic>)
+      '/api/v1/services/search?q=${Uri.encodeComponent(args.q)}$maxPrice');
+  return (unwrapEnvelope(res) as List<dynamic>)
       .map((s) => SearchService.fromJson(s as Map<String, dynamic>))
       .toList();
-  final meta = res.data?['meta'] as Map<String, dynamic>? ?? const {};
-  final total = meta['total'] as int? ?? items.length;
-  final perPage = meta['per_page'] as int? ?? 10;
-  return (
-    items: items,
-    totalPages: total <= 0 ? 1 : (total + perPage - 1) ~/ perPage,
-  );
 });
 
 const _priceCaps = <int?>[null, 20000, 50000, 100000];
@@ -81,7 +70,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       TextEditingController(text: widget.initialQuery);
   late String _submitted = widget.initialQuery;
   int? _maxPrice;
-  int _page = 1;
 
   @override
   void dispose() {
@@ -92,8 +80,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final results = ref.watch(serviceSearchProvider(
-        (q: _submitted, maxPricePaise: _maxPrice, page: _page)));
+    final results = ref
+        .watch(serviceSearchProvider((q: _submitted, maxPricePaise: _maxPrice)));
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.searchResults)),
@@ -104,10 +92,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             child: TextField(
               controller: _query,
               autofocus: widget.initialQuery.isEmpty,
-              onSubmitted: (v) => setState(() {
-                _submitted = v.trim();
-                _page = 1; // new query starts from the first page
-              }),
+              onSubmitted: (v) => setState(() => _submitted = v.trim()),
               decoration: InputDecoration(
                 hintText: l10n.searchAllServices,
                 prefixIcon: const Icon(Icons.search),
@@ -131,10 +116,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           ? l10n.anyPrice
                           : '≤ ₹${cap ~/ 100}'),
                       selected: _maxPrice == cap,
-                      onSelected: (_) => setState(() {
-                        _maxPrice = cap;
-                        _page = 1; // filter change resets paging
-                      }),
+                      onSelected: (_) => setState(() => _maxPrice = cap),
                     ),
                   ),
               ],
@@ -145,15 +127,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               loading: () =>
                   const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text(apiErrorMessage(e))),
-              data: (page) => page.items.isEmpty
+              data: (items) => items.isEmpty
                   ? Center(child: Text(l10n.noResults))
                   : ListView.separated(
                       padding: const EdgeInsets.all(16),
-                      itemCount: page.items.length,
+                      itemCount: items.length,
                       separatorBuilder: (_, __) =>
                           const SizedBox(height: 8),
                       itemBuilder: (context, i) {
-                        final service = page.items[i];
+                        final service = items[i];
                         return Card(
                           elevation: 0,
                           color: Theme.of(context)
@@ -194,16 +176,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       },
                     ),
             ),
-          ),
-          results.maybeWhen(
-            data: (page) => page.totalPages > 1
-                ? PaginationBar(
-                    page: _page,
-                    totalPages: page.totalPages,
-                    onPage: (p) => setState(() => _page = p),
-                  )
-                : const SizedBox.shrink(),
-            orElse: () => const SizedBox.shrink(),
           ),
         ],
       ),

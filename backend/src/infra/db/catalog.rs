@@ -39,31 +39,15 @@ pub async fn list_categories(pg: &PgPool) -> Result<Vec<Category>, AppError> {
     .await?)
 }
 
-/// Explore lists fetch exactly one page (10 rows) per request.
-pub const PAGE_SIZE: i64 = 10;
-
-pub async fn list_services(
-    pg: &PgPool,
-    category_id: Uuid,
-    page: i64,
-) -> Result<(Vec<Service>, i64), AppError> {
-    let total: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM services
-         WHERE category_id = $1 AND is_active AND deleted_at IS NULL",
-    )
-    .bind(category_id)
-    .fetch_one(pg)
-    .await?;
-    let items = sqlx::query_as::<_, Service>(&format!(
+pub async fn list_services(pg: &PgPool, category_id: Uuid) -> Result<Vec<Service>, AppError> {
+    Ok(sqlx::query_as::<_, Service>(&format!(
         "SELECT {SERVICE_COLS} FROM services
          WHERE category_id = $1 AND is_active AND deleted_at IS NULL
-         ORDER BY name LIMIT {PAGE_SIZE} OFFSET $2"
+         ORDER BY name"
     ))
     .bind(category_id)
-    .bind((page - 1).max(0) * PAGE_SIZE)
     .fetch_all(pg)
-    .await?;
-    Ok((items, total))
+    .await?)
 }
 
 /// Admin listing: includes deactivated rows so they can be re-enabled.
@@ -98,42 +82,30 @@ pub struct SearchResult {
 }
 
 /// Advanced search across service name/description/category, optional
-/// price ceiling; active rows only. One 10-row page per request.
+/// price ceiling; active rows only.
 pub async fn search(
     pg: &PgPool,
     q: &str,
     max_price_paise: Option<i64>,
-    page: i64,
-) -> Result<(Vec<SearchResult>, i64), AppError> {
-    const FILTER: &str = "s.is_active AND s.deleted_at IS NULL
-           AND c.is_active AND c.deleted_at IS NULL
-           AND ($1 = '' OR s.name ILIKE '%' || $1 || '%'
-                        OR s.description ILIKE '%' || $1 || '%'
-                        OR c.name ILIKE '%' || $1 || '%')
-           AND ($2::bigint IS NULL OR s.base_price_paise <= $2)";
-    let total: i64 = sqlx::query_scalar(&format!(
-        "SELECT count(*) FROM services s
-         JOIN categories c ON c.id = s.category_id WHERE {FILTER}"
-    ))
-    .bind(q)
-    .bind(max_price_paise)
-    .fetch_one(pg)
-    .await?;
-    let items = sqlx::query_as::<_, SearchResult>(&format!(
+) -> Result<Vec<SearchResult>, AppError> {
+    Ok(sqlx::query_as::<_, SearchResult>(
         "SELECT s.id, s.category_id, c.name AS category_name, s.name,
                 s.description, s.base_price_paise, s.duration_min
          FROM services s
          JOIN categories c ON c.id = s.category_id
-         WHERE {FILTER}
+         WHERE s.is_active AND s.deleted_at IS NULL
+           AND c.is_active AND c.deleted_at IS NULL
+           AND ($1 = '' OR s.name ILIKE '%' || $1 || '%'
+                        OR s.description ILIKE '%' || $1 || '%'
+                        OR c.name ILIKE '%' || $1 || '%')
+           AND ($2::bigint IS NULL OR s.base_price_paise <= $2)
          ORDER BY s.base_price_paise ASC
-         LIMIT {PAGE_SIZE} OFFSET $3"
-    ))
+         LIMIT 50",
+    )
     .bind(q)
     .bind(max_price_paise)
-    .bind((page - 1).max(0) * PAGE_SIZE)
     .fetch_all(pg)
-    .await?;
-    Ok((items, total))
+    .await?)
 }
 
 pub async fn create_category(

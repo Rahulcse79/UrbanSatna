@@ -28,8 +28,6 @@ class AppConfig {
     this.termsUrl,
     this.privacyUrl,
     this.supportOnline = false,
-    this.userPolicyText,
-    this.acceptanceText,
   });
 
   final bool allowServerUrlChange;
@@ -69,12 +67,6 @@ class AppConfig {
 
   /// Live-support indicator: green (true) / red (false).
   final bool supportOnline;
-
-  /// Admin-written User Policy body (null = fall back to termsUrl).
-  final String? userPolicyText;
-
-  /// Admin-written acceptance line shown at registration.
-  final String? acceptanceText;
 
   /// The build a device must have to pass the version gate.
   int get effectiveMinBuild =>
@@ -119,8 +111,6 @@ final appConfigProvider = FutureProvider.autoDispose<AppConfig>((ref) async {
       termsUrl: data['terms_url'] as String?,
       privacyUrl: data['privacy_url'] as String?,
       supportOnline: data['support_online'] as bool? ?? false,
-      userPolicyText: data['user_policy_text'] as String?,
-      acceptanceText: data['acceptance_text'] as String?,
     );
   } catch (_) {
     return const AppConfig(allowServerUrlChange: true);

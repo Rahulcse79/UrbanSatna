@@ -145,13 +145,6 @@ pub async fn admin_send(
     Json(msg): Json<NewMessage>,
 ) -> Result<Json<ApiResponse<support::SupportMessage>>, AppError> {
     current.require_perm("bookings:manage:any")?;
-    // Support chat is staff → customer only: admins never message admins.
-    let (roles, _) = users::roles_and_perms(&state.pg, user_id).await?;
-    if roles.iter().any(|r| r == "admin" || r == "super_admin") {
-        return Err(AppError::Conflict(
-            "support chat with another admin is not allowed".into(),
-        ));
-    }
     let body = valid_body(&msg.body)?;
     Ok(Json(ApiResponse::ok(
         support::send(&state.pg, user_id, current.id, body).await?,

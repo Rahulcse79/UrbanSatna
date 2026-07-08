@@ -115,7 +115,7 @@ pub async fn available_jobs(
     State(state): State<AppState>,
     current: CurrentUser,
 ) -> Result<Json<ApiResponse<Vec<bookings::Booking>>>, AppError> {
-    current.require_role("serviceman")?;
+    current.require_role("worker")?;
     let jobs = bookings::redact_all_for_worker(bookings::available(&state.pg, current.id).await?)
         .into_iter()
         .map(bookings::Booking::redact_contact)
@@ -127,7 +127,7 @@ pub async fn my_jobs(
     State(state): State<AppState>,
     current: CurrentUser,
 ) -> Result<Json<ApiResponse<Vec<bookings::Booking>>>, AppError> {
-    current.require_role("serviceman")?;
+    current.require_role("worker")?;
     Ok(Json(ApiResponse::ok(bookings::redact_all_for_worker(
         bookings::my_jobs(&state.pg, current.id).await?,
     ))))
@@ -137,7 +137,7 @@ pub async fn earnings(
     State(state): State<AppState>,
     current: CurrentUser,
 ) -> Result<Json<ApiResponse<bookings::Earnings>>, AppError> {
-    current.require_role("serviceman")?;
+    current.require_role("worker")?;
     Ok(Json(ApiResponse::ok(
         bookings::earnings(&state.pg, current.id).await?,
     )))
@@ -148,7 +148,7 @@ pub async fn history(
     State(state): State<AppState>,
     current: CurrentUser,
 ) -> Result<Json<ApiResponse<Vec<bookings::Booking>>>, AppError> {
-    current.require_role("serviceman")?;
+    current.require_role("worker")?;
     Ok(Json(ApiResponse::ok(bookings::redact_all_for_worker(
         bookings::worker_history(&state.pg, current.id).await?,
     ))))
@@ -159,12 +159,12 @@ pub async fn accept(
     current: CurrentUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<bookings::Booking>>, AppError> {
-    current.require_role("serviceman")?;
+    current.require_role("worker")?;
     let booking = bookings::accept(&state.pg, id, current.id).await?;
     audit::log(
         &state.pg,
         Some(current.id),
-        "serviceman",
+        "worker",
         "booking.accepted",
         "booking",
         Some(id),
@@ -187,13 +187,13 @@ pub async fn advance(
     Path(id): Path<Uuid>,
     Json(body): Json<StatusAction>,
 ) -> Result<Json<ApiResponse<bookings::Booking>>, AppError> {
-    current.require_role("serviceman")?;
+    current.require_role("worker")?;
     let booking =
         bookings::advance(&state.pg, id, current.id, &body.action, body.otp.as_deref()).await?;
     audit::log(
         &state.pg,
         Some(current.id),
-        "serviceman",
+        "worker",
         "booking.state_changed",
         "booking",
         Some(id),

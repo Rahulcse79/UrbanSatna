@@ -272,17 +272,6 @@ class AdminPanelScreen extends ConsumerWidget {
                   onTap: () => _editAnnouncement(context, ref, c),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.policy),
-                  title: Text(l10n.userPolicyTitle),
-                  subtitle: Text(
-                    c.userPolicyText ?? c.acceptanceText ?? '—',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _editPolicy(context, ref, c),
-                ),
-                ListTile(
                   leading: const Icon(Icons.event_busy),
                   title: Text(l10n.bookingControlsTitle),
                   subtitle: Text(
@@ -521,68 +510,6 @@ class AdminPanelScreen extends ConsumerWidget {
       'bookings_paused': paused,
       'bookings_paused_message': message.text.trim(),
       'max_active_bookings': max,
-    });
-  }
-
-  /// User Policy & acceptance line: fully admin-written, shown at
-  /// registration (empty policy falls back to the terms URL).
-  Future<void> _editPolicy(
-    BuildContext context,
-    WidgetRef ref,
-    AppConfig c,
-  ) async {
-    final l10n = AppLocalizations.of(context);
-    final policy = TextEditingController(text: c.userPolicyText ?? '');
-    final acceptance = TextEditingController(text: c.acceptanceText ?? '');
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.userPolicyTitle),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: policy,
-                minLines: 5,
-                maxLines: 12,
-                decoration: InputDecoration(
-                  labelText: l10n.policyTextLabel,
-                  alignLabelWithHint: true,
-                  filled: true,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: acceptance,
-                minLines: 1,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: l10n.acceptanceTextLabel,
-                  filled: true,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l10n.save),
-          ),
-        ],
-      ),
-    );
-    if (saved != true || !context.mounted) return;
-    await _patch(context, ref, {
-      'user_policy_text': policy.text.trim(),
-      'acceptance_text': acceptance.text.trim(),
     });
   }
 
