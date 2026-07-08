@@ -115,7 +115,8 @@ UrbanSatna/
         redis/  storage/  fcm/  sms/  payments/  maps/
       middleware/           # auth, RBAC, rate-limit, request_id, tracing
       jobs/                 # background workers (PG SKIP LOCKED queue)
-    migrations/             # sqlx *.sql, forward-only
+    migrations/             # sqlx NNNN_name.{up,down}.sql pairs — docs/MIGRATIONS.md
+    scripts/                # db.sh (dev DB helper), check_migrations.sh (CI guard)
     tests/                  # integration tests (testcontainers)
   mobile/
     lib/
@@ -142,8 +143,11 @@ UrbanSatna/
 cargo run                          # start API against local compose stack
 cargo test                         # unit + integration tests
 cargo fmt --all && cargo clippy --all-targets -- -D warnings
-sqlx migrate add <name>            # new migration
-sqlx migrate run                   # apply migrations
+scripts/db.sh new <name>           # new up+down migration pair
+scripts/db.sh status               # applied vs pending migrations
+scripts/db.sh check                # detect migration drift
+scripts/db.sh reset                # drop + recreate + re-migrate dev DB
+sqlx migrate run                   # apply migrations (sqlx-cli)
 cargo sqlx prepare                 # refresh offline query metadata (commit it)
 
 # Mobile (run from mobile/)
@@ -169,7 +173,11 @@ docker compose -f infra/docker-compose.yml up -d   # PG + Redis + MinIO
 - Booking state machine is enforced in `domain`, not scattered in handlers:
   `created → searching → assigned → accepted → en_route → arrived →
   otp_verified → in_progress → completed → paid | cancelled | disputed`.
-- Migrations are forward-only; never edit a shipped migration.
+- Migrations are reversible pairs (`NNNN_name.up.sql` + `.down.sql`) with
+  sequential versions; the down exactly reverses the up. Once a migration is
+  on `main`, never edit, rename, or delete it (CI enforces this) — write a new
+  migration instead. Downs are dev-only tools (branch switching); production
+  is forward-only and never runs `revert`. Full workflow: `docs/MIGRATIONS.md`.
 - Index every FK and every column used in WHERE/ORDER BY on hot paths.
   Nearby-worker search uses a geo index (PostGIS `GIST` or Redis GEO).
 

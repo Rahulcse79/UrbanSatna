@@ -6,6 +6,18 @@ on:
   pull_request:
 
 jobs:
+  migrations:
+    name: Migration guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Migration history is append-only
+        run: backend/scripts/check_migrations.sh
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+
   backend:
     name: Backend (Rust)
     runs-on: ubuntu-latest
