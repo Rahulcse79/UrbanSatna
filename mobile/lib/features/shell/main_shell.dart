@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/widgets/bot_avatar.dart';
 import '../../l10n/gen/app_localizations.dart';
 import '../bookings/presentation/bookings_screen.dart';
 import '../home/presentation/home_screen.dart';
@@ -38,7 +40,17 @@ class MainShell extends ConsumerWidget {
         ref.watch(currentTabProvider).clamp(0, pages.length - 1);
 
     return Scaffold(
-      body: IndexedStack(index: tab, children: pages),
+      body: Stack(
+        children: [
+          IndexedStack(index: tab, children: pages),
+          // Support chat launcher: the bot mascot, bottom-left on every tab.
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: SafeArea(child: _SupportChatButton(label: l10n.liveChat)),
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab,
         onDestinationSelected: (i) =>
@@ -66,6 +78,33 @@ class MainShell extends ConsumerWidget {
             label: l10n.navProfile,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Floating live-chat launcher wearing the bot mascot.
+class _SupportChatButton extends StatelessWidget {
+  const _SupportChatButton({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: Material(
+        elevation: 6,
+        shadowColor: Colors.black45,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => context.push('/support-chat'),
+          child: const Padding(
+            padding: EdgeInsets.all(3),
+            child: BotAvatar(size: 52),
+          ),
+        ),
       ),
     );
   }

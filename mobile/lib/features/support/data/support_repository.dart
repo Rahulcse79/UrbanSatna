@@ -8,6 +8,7 @@ class SupportMessage {
     required this.id,
     required this.body,
     required this.fromSupport,
+    required this.fromBot,
     required this.createdAt,
   });
 
@@ -16,12 +17,16 @@ class SupportMessage {
         id: json['id'] as String,
         body: json['body'] as String,
         fromSupport: json['from_support'] as bool? ?? false,
+        fromBot: json['from_bot'] as bool? ?? false,
         createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
       );
 
   final String id;
   final String body;
   final bool fromSupport;
+
+  /// Chatbot replies render with the bot identity (avatar + name).
+  final bool fromBot;
   final DateTime createdAt;
 }
 

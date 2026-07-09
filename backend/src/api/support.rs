@@ -5,56 +5,14 @@ use uuid::Uuid;
 
 use super::envelope::ApiResponse;
 use crate::domain::error::AppError;
+use crate::infra::bot;
 use crate::infra::db::{settings, support, users};
 use crate::middleware::auth::CurrentUser;
 use crate::state::AppState;
 
-/// System account the chatbot speaks through (auto-provisioned).
-const BOT_PHONE: &str = "+910000000001";
-
-/// First-line chatbot: instant rule-based replies while the human team
-/// is offline (support_online = false). A human takes over by flipping
-/// the flag — the bot then stays silent.
-fn bot_reply(text: &str) -> String {
-    let t = text.to_lowercase();
-    let greeting = matches!(
-        t.trim(),
-        "hi" | "hello" | "hey" | "namaste" | "नमस्ते" | "hii" | "hlo"
-    );
-    if t.contains("booking") || t.contains("बुकिंग") || t.contains("cancel") {
-        "🤖 For booking help: open Bookings, tap the booking, and use \
-         Cancel or Chat with your technician. Your arrival OTP is on the \
-         booking card. A team member will follow up soon."
-    } else if t.contains("payment")
-        || t.contains("refund")
-        || t.contains("भुगतान")
-        || t.contains("paisa")
-        || t.contains("money")
-    {
-        "🤖 Payments are collected after the service (cash/UPI). For a \
-         wrong charge or refund, please also raise a ticket from Profile → \
-         Report a problem — our team will review it quickly."
-    } else if t.contains("worker")
-        || t.contains("late")
-        || t.contains("वर्कर")
-        || t.contains("technician")
-    {
-        "🤖 You can see your technician's status on the booking card and \
-         call them directly with the call button. If nobody accepted yet, \
-         we're still searching nearby professionals."
-    } else if greeting {
-        "🤖 Namaste! I'm the Servexa assistant. Tell me about a booking, \
-         payment, or worker issue — or type your question and our team \
-         will reply as soon as they're online."
-    } else {
-        "🤖 Thanks for your message! Our support team is currently \
-         offline and will reply as soon as possible. Meanwhile: booking \
-         issues → Bookings tab · payments → pay after service (cash/UPI) \
-         · urgent problems → Profile → Report a problem."
-    }
-    .to_string()
-}
-
+/// First-line chatbot: instant replies (AI when configured, keyword bot
+/// otherwise) while the human team is offline (support_online = false).
+/// A human takes over by flipping the flag — the bot then stays silent.
 async fn maybe_bot_reply(state: &AppState, user_id: Uuid, text: &str) -> Result<(), AppError> {
     let online = settings::get_json(&state.pg, "support_online")
         .await?
@@ -63,12 +21,12 @@ async fn maybe_bot_reply(state: &AppState, user_id: Uuid, text: &str) -> Result<
     if online {
         return Ok(()); // humans are on shift; the bot stays quiet
     }
-    let (bot, created) = users::find_or_create_by_phone(&state.pg, BOT_PHONE).await?;
-    if created || bot.full_name.is_none() {
+    let (bot_user, created) = users::find_or_create_by_phone(&state.pg, bot::BOT_PHONE).await?;
+    if created || bot_user.full_name.is_none() {
         users::update_profile(
             &state.pg,
-            bot.id,
-            Some("Servexa Bot"),
+            bot_user.id,
+            Some(bot::BOT_NAME),
             None,
             None,
             None,
@@ -78,7 +36,10 @@ async fn maybe_bot_reply(state: &AppState, user_id: Uuid, text: &str) -> Result<
         )
         .await?;
     }
-    support::send(&state.pg, user_id, bot.id, &bot_reply(text)).await?;
+    // Includes the message just sent — that's the turn the bot answers.
+    let history = support::thread(&state.pg, user_id).await?;
+    let reply = state.bot.reply(&history, user_id, text).await;
+    support::send(&state.pg, user_id, bot_user.id, &reply).await?;
     Ok(())
 }
 

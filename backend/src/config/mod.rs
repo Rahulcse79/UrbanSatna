@@ -23,6 +23,10 @@ pub struct Config {
     /// Dev flag: include the OTP in the response instead of sending SMS.
     /// MUST stay false anywhere real users exist.
     pub dev_return_otp: bool,
+    /// Anthropic API key for the AI support chatbot. Unset → keyword bot.
+    pub anthropic_api_key: Option<String>,
+    /// Model the support chatbot uses when the API key is configured.
+    pub support_bot_model: String,
 }
 
 impl Config {
@@ -57,6 +61,10 @@ impl Config {
             .filter(|s| !s.is_empty())
             .collect();
         let dev_return_otp = env_or("DEV_RETURN_OTP", "false") == "true";
+        let anthropic_api_key = std::env::var("ANTHROPIC_API_KEY")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
+        let support_bot_model = env_or("SUPPORT_BOT_MODEL", "claude-opus-4-8");
 
         Ok(Self {
             host,
@@ -71,6 +79,8 @@ impl Config {
             refresh_ttl_days,
             admin_phones,
             dev_return_otp,
+            anthropic_api_key,
+            support_bot_model,
         })
     }
 }

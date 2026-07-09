@@ -174,7 +174,8 @@ class _CompleteProfileScreenState
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              initialValue: _state,
+              // ignore: deprecated_member_use — see login_screen.dart
+              value: _state,
               isExpanded: true,
               items: [
                 for (final s in _states.keys)
@@ -199,7 +200,8 @@ class _CompleteProfileScreenState
             // trips Flutter's dropdown assertion.
             DropdownButtonFormField<String>(
               key: ValueKey(_state),
-              initialValue: _city,
+              // ignore: deprecated_member_use — see login_screen.dart
+              value: _city,
               isExpanded: true,
               items: [
                 for (final c in cities)

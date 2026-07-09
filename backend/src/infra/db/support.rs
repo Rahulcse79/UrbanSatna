@@ -11,19 +11,28 @@ pub struct SupportMessage {
     pub user_id: Uuid,
     pub sender_id: Uuid,
     pub sender_name: Option<String>,
-    /// True when a staff member sent it (renders on the other side).
+    /// True when a staff member or the bot sent it (renders on the other side).
     pub from_support: bool,
+    /// True when the chatbot sent it (renders with the bot identity).
+    pub from_bot: bool,
     pub body: String,
     pub created_at: DateTime<Utc>,
 }
 
-const SELECT: &str = "SELECT m.id, m.user_id, m.sender_id, u.full_name AS sender_name,
-       (m.sender_id <> m.user_id) AS from_support, m.body, m.created_at
-  FROM support_messages m JOIN users u ON u.id = m.sender_id";
+fn select() -> String {
+    format!(
+        "SELECT m.id, m.user_id, m.sender_id, u.full_name AS sender_name,
+                (m.sender_id <> m.user_id) AS from_support,
+                (u.phone = '{}') AS from_bot, m.body, m.created_at
+           FROM support_messages m JOIN users u ON u.id = m.sender_id",
+        crate::infra::bot::BOT_PHONE
+    )
+}
 
 pub async fn thread(pg: &PgPool, user_id: Uuid) -> Result<Vec<SupportMessage>, AppError> {
     Ok(sqlx::query_as::<_, SupportMessage>(&format!(
-        "{SELECT} WHERE m.user_id = $1 ORDER BY m.created_at ASC LIMIT 500"
+        "{} WHERE m.user_id = $1 ORDER BY m.created_at ASC LIMIT 500",
+        select()
     ))
     .bind(user_id)
     .fetch_all(pg)
@@ -47,7 +56,7 @@ pub async fn send(
     .bind(body)
     .execute(pg)
     .await?;
-    sqlx::query_as::<_, SupportMessage>(&format!("{SELECT} WHERE m.id = $1"))
+    sqlx::query_as::<_, SupportMessage>(&format!("{} WHERE m.id = $1", select()))
         .bind(id)
         .fetch_one(pg)
         .await

@@ -127,7 +127,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   SizedBox(
                     width: 96,
                     child: DropdownButtonFormField<String>(
-                      initialValue: _countryCode,
+                      // ignore: deprecated_member_use — `initialValue` needs
+                      // Flutter ≥3.33; `value` still works there and is the
+                      // only spelling the macOS-12 dev toolchain (3.27) has.
+                      value: _countryCode,
                       items: [
                         for (final code in codes)
                           DropdownMenuItem(value: code, child: Text(code)),

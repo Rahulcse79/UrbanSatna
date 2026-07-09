@@ -265,6 +265,34 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: "Quote a coupon for me: ?code=&service_id= → {discount_paise, final_paise}; 409 when already used (one use per user, forever)"
       responses: { "200": { description: quote }, "404": { description: invalid }, "409": { description: already used } }
+  /api/v1/support/messages:
+    get:
+      tags: [support]
+      security: [{ bearerAuth: [] }]
+      summary: "My live-support thread. SupportMessage: {id, user_id, sender_id, sender_name?, from_support, from_bot, body, created_at}; from_bot marks chatbot replies"
+      responses: { "200": { description: "[SupportMessage]" } }
+    post:
+      tags: [support]
+      security: [{ bearerAuth: [] }]
+      summary: "Send message {body} (1-2000 chars). While support_online=false the chatbot (AI when ANTHROPIC_API_KEY set, keyword bot otherwise) replies into the thread"
+      responses: { "200": { description: SupportMessage } }
+  /api/v1/admin/support/threads:
+    get:
+      tags: [support]
+      security: [{ bearerAuth: [] }]
+      summary: "Admin inbox: one row per conversation {user_id, phone, full_name?, last_body, last_at, awaiting_reply} (perm bookings:manage:any)"
+      responses: { "200": { description: "[SupportThread]" } }
+  /api/v1/admin/support/{user_id}/messages:
+    get:
+      tags: [support]
+      security: [{ bearerAuth: [] }]
+      summary: A customer's support thread (perm bookings:manage:any)
+      responses: { "200": { description: "[SupportMessage]" } }
+    post:
+      tags: [support]
+      security: [{ bearerAuth: [] }]
+      summary: "Staff reply {body} into the customer's thread (perm bookings:manage:any)"
+      responses: { "200": { description: SupportMessage } }
   /api/v1/tickets:
     post:
       tags: [bookings]

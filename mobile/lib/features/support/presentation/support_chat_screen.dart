@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/bot_avatar.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../data/support_repository.dart';
 
@@ -149,30 +150,77 @@ class _SupportChatScreenState extends ConsumerState<SupportChatScreen> {
                     final mine = isAdminView
                         ? message.fromSupport
                         : !message.fromSupport;
+                    final isBot = message.fromBot;
+                    final bubble = Container(
+                      margin: const EdgeInsets.symmetric(vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      constraints: BoxConstraints(
+                          maxWidth:
+                              MediaQuery.of(context).size.width * 0.75),
+                      decoration: BoxDecoration(
+                        color: isBot
+                            ? scheme.tertiaryContainer
+                            : mine
+                                ? scheme.primary
+                                : scheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (isBot)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 2),
+                              child: Text(
+                                l10n.botName,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: scheme.onTertiaryContainer
+                                        .withValues(alpha: 0.7)),
+                              ),
+                            ),
+                          Text(
+                            message.body,
+                            style: TextStyle(
+                                color: isBot
+                                    ? scheme.onTertiaryContainer
+                                    : mine
+                                        ? scheme.onPrimary
+                                        : scheme.onSurface),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (!isBot) {
+                      return Align(
+                        alignment: mine
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: bubble,
+                      );
+                    }
+                    // Bot replies carry the mascot next to the bubble.
                     return Align(
                       alignment: mine
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 3),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        constraints: BoxConstraints(
-                            maxWidth:
-                                MediaQuery.of(context).size.width * 0.75),
-                        decoration: BoxDecoration(
-                          color: mine
-                              ? scheme.primary
-                              : scheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          message.body,
-                          style: TextStyle(
-                              color: mine
-                                  ? scheme.onPrimary
-                                  : scheme.onSurface),
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: mine
+                            ? [
+                                Flexible(child: bubble),
+                                const SizedBox(width: 6),
+                                const BotAvatar(size: 26),
+                              ]
+                            : [
+                                const BotAvatar(size: 26),
+                                const SizedBox(width: 6),
+                                Flexible(child: bubble),
+                              ],
                       ),
                     );
                   },
