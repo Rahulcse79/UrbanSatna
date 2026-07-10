@@ -11,6 +11,7 @@ class WorkerApplication {
     required this.status,
     required this.phone,
     required this.createdAt,
+    this.userId,
     this.fullName,
     this.skills,
     this.experience,
@@ -25,6 +26,7 @@ class WorkerApplication {
         status: json['status'] as String,
         phone: json['phone'] as String,
         createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+        userId: json['user_id'] as String?,
         fullName: json['full_name'] as String?,
         skills: json['skills'] as String?,
         experience: json['experience'] as String?,
@@ -37,6 +39,7 @@ class WorkerApplication {
   final String status;
   final String phone;
   final DateTime createdAt;
+  final String? userId;
   final String? fullName;
   final String? skills;
   final String? experience;
@@ -59,10 +62,17 @@ final myWorkerApplicationProvider =
   return ref.watch(workerRepositoryProvider).myApplication();
 });
 
-/// Admin verification queue.
-final pendingApplicationsProvider =
-    FutureProvider.autoDispose<List<WorkerApplication>>((ref) {
-  return ref.watch(workerRepositoryProvider).pendingApplications();
+/// One page of the admin verification queue.
+typedef ApplicationsPage = ({
+  List<WorkerApplication> items,
+  int total,
+  int page
+});
+
+/// Admin verification queue keyed by page — server paginates 10/page.
+final pendingApplicationsProvider = FutureProvider.autoDispose
+    .family<ApplicationsPage, int>((ref, page) {
+  return ref.watch(workerRepositoryProvider).pendingApplications(page);
 });
 
 class WorkerRepository {
@@ -94,13 +104,31 @@ class WorkerRepository {
     return WorkerApplication.fromJson(data as Map<String, dynamic>);
   }
 
-  Future<List<WorkerApplication>> pendingApplications() async {
+  Future<ApplicationsPage> pendingApplications(int page) async {
     final res = await _dio.get<Map<String, dynamic>>(
-        '/api/v1/admin/worker-applications?status=pending');
-    final data = unwrapEnvelope(res) as List<dynamic>;
-    return data
-        .map((a) => WorkerApplication.fromJson(a as Map<String, dynamic>))
-        .toList();
+        '/api/v1/admin/worker-applications?status=pending&page=$page');
+    final data = unwrapEnvelope(res) as Map<String, dynamic>;
+    return (
+      items: (data['items'] as List<dynamic>)
+          .map((a) => WorkerApplication.fromJson(a as Map<String, dynamic>))
+          .toList(),
+      total: data['total'] as int,
+      page: data['page'] as int,
+    );
+  }
+
+  /// Admin: a user's profile photo; null when unset.
+  Future<Uint8List?> userAvatar(String userId) async {
+    try {
+      final res = await _dio.get<List<int>>(
+        '/api/v1/admin/users/$userId/avatar',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final data = res.data;
+      return data == null ? null : Uint8List.fromList(data);
+    } on DioException {
+      return null;
+    }
   }
 
   Future<void> decide(String id, {required bool approve, String? note}) =>

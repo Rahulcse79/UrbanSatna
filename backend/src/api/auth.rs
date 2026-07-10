@@ -87,9 +87,14 @@ pub async fn verify_otp(
             user.block_reason.as_deref().unwrap_or("contact support")
         )));
     }
-    users::grant_role(&state.pg, user.id, "customer").await?;
+    // Staff are not customers: admin accounts carry the admin role only
+    // (self-heals accounts that predate the separation), everyone else
+    // is a customer.
     if state.config.admin_phones.contains(&body.phone) {
         users::grant_role(&state.pg, user.id, "admin").await?;
+        users::revoke_role(&state.pg, user.id, "customer").await?;
+    } else {
+        users::grant_role(&state.pg, user.id, "customer").await?;
     }
     if created {
         audit::log(

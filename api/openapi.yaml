@@ -46,7 +46,8 @@ paths:
         Public runtime config: {allow_server_url_change, promo_enabled,
         promo_title?, promo_subtitle?, maintenance_mode, min_build,
         latest_build, require_latest, city_label?, app_display_name?,
-        tagline?, theme_preset, support_phone?, announcement_enabled,
+        tagline?, theme_preset, support_phone?, server_url?,
+        announcement_enabled,
         announcement_text?, bookings_paused, bookings_paused_message?,
         max_active_bookings}. Version gate: app is blocked when
         build < min_build, or build < latest_build while require_latest.
@@ -362,8 +363,8 @@ paths:
     get:
       tags: [admin]
       security: [{ bearerAuth: [] }]
-      summary: Verification queue; ?status=pending(default)|approved|rejected (perm workers:verify)
-      responses: { "200": { description: "[WorkerApplication]" } }
+      summary: "Verification queue, 10/page; ?status=pending(default)|approved|rejected&page= (perm workers:verify)"
+      responses: { "200": { description: "{items, total, page, per_page}" } }
   /api/v1/admin/worker-applications/{id}/decide:
     post:
       tags: [admin]

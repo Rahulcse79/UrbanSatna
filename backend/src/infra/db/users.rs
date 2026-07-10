@@ -109,6 +109,19 @@ pub async fn grant_role(pg: &PgPool, user_id: Uuid, role: &str) -> Result<(), Ap
     Ok(())
 }
 
+/// Idempotently removes a role by name.
+pub async fn revoke_role(pg: &PgPool, user_id: Uuid, role: &str) -> Result<(), AppError> {
+    sqlx::query(
+        "DELETE FROM user_roles ur USING roles r
+         WHERE ur.user_id = $1 AND ur.role_id = r.id AND r.name = $2",
+    )
+    .bind(user_id)
+    .bind(role)
+    .execute(pg)
+    .await?;
+    Ok(())
+}
+
 /// All role names + permission codes for the user (for JWT claims).
 pub async fn roles_and_perms(
     pg: &PgPool,

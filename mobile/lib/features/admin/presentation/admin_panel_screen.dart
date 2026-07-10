@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
@@ -14,8 +13,9 @@ final adminStatsProvider =
   return unwrapEnvelope(res) as Map<String, dynamic>;
 });
 
-/// Admin hub: live dashboard numbers + runtime controls that apply to
-/// every user instantly (PRODUCT.md §6.5 — the control plane).
+/// Runtime controls that apply to every user instantly (PRODUCT.md §6.5
+/// — the control plane). Stats and tool shortcuts live on the admin
+/// dashboard; this screen is the app-settings side of the panel.
 class AdminPanelScreen extends ConsumerWidget {
   const AdminPanelScreen({super.key});
 
@@ -35,135 +35,83 @@ class AdminPanelScreen extends ConsumerWidget {
     }
   }
 
+  /// Set / update / unset the fleet server URL. An empty save (or the
+  /// Unset action) clears it — apps fall back to their built-in default.
+  Future<void> _editServerUrl(
+    BuildContext context,
+    WidgetRef ref,
+    AppConfig c,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final controller = TextEditingController(text: c.serverUrl ?? '');
+    final action = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            const Icon(Icons.dns),
+            const SizedBox(width: 10),
+            Expanded(child: Text(l10n.serverUrlLabel)),
+          ],
+        ),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(
+            labelText: l10n.serverUrlLabel,
+            hintText: 'https://…',
+            helperText: l10n.serverUrlAdminHint,
+            helperMaxLines: 3,
+            filled: true,
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none),
+          ),
+        ),
+        actions: [
+          if (c.serverUrl?.isNotEmpty == true)
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop('unset'),
+              child: Text(l10n.unsetLabel),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop('save'),
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    if (action == 'unset') {
+      await _patch(context, ref, {'server_url': ''});
+      return;
+    }
+    final url = controller.text.trim();
+    if (url.isNotEmpty &&
+        !url.startsWith('http://') &&
+        !url.startsWith('https://')) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.serverUrlInvalid)));
+      return;
+    }
+    await _patch(context, ref, {'server_url': url});
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final config = ref.watch(appConfigProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.adminPanel)),
+      appBar: AppBar(title: Text(l10n.appSettingsTitle)),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          Consumer(builder: (context, ref, _) {
-            final stats = ref.watch(adminStatsProvider).maybeWhen(
-                data: (s) => s, orElse: () => null);
-            if (stats == null) return const SizedBox.shrink();
-            String rupees(dynamic paise) =>
-                '₹${(((paise as int?) ?? 0) / 100).toStringAsFixed(0)}';
-            // Each metric gets its own color for at-a-glance scanning.
-            final tiles = <(String, String, IconData, MaterialColor)>[
-              ('${stats['bookings_today'] ?? 0}', l10n.statBookingsToday,
-                  Icons.receipt_long, Colors.indigo),
-              (rupees(stats['revenue_today_paise']), l10n.statRevenueToday,
-                  Icons.currency_rupee, Colors.green),
-              ('${stats['active_bookings'] ?? 0}', l10n.statActive,
-                  Icons.pending_actions, Colors.blue),
-              ('${stats['open_tickets'] ?? 0}', l10n.statOpenTickets,
-                  Icons.confirmation_number, Colors.orange),
-              ('${stats['pending_applications'] ?? 0}', l10n.statPendingKyc,
-                  Icons.how_to_reg, Colors.purple),
-              ('${stats['total_users'] ?? 0}', l10n.statUsers, Icons.group,
-                  Colors.teal),
-            ];
-            final dark = Theme.of(context).brightness == Brightness.dark;
-            final scheme = Theme.of(context).colorScheme;
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1.0,
-                children: [
-                  for (final (value, label, icon, color) in tiles)
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: dark
-                            ? color.shade900.withValues(alpha: 0.32)
-                            : color.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                            color: color.withValues(alpha: 0.25)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(icon,
-                              size: 20,
-                              color: dark
-                                  ? color.shade200
-                                  : color.shade700),
-                          const Spacer(),
-                          Text(value,
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 18,
-                                  color: dark
-                                      ? color.shade100
-                                      : color.shade900)),
-                          Text(label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(
-                                      color: scheme.onSurfaceVariant)),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            );
-          }),
-          ListTile(
-            leading: const Icon(Icons.how_to_reg),
-            title: Text(l10n.workerApprovals),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/admin/approvals'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.group),
-            title: Text(l10n.usersAdmin),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/admin/users'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.history),
-            title: Text(l10n.logsAdmin),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/admin/logs'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.category),
-            title: Text(l10n.manageCatalog),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/admin/catalog'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.confirmation_number),
-            title: Text(l10n.ticketsAdmin),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/admin/tickets'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.forum),
-            title: Text(l10n.supportInbox),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/admin/support'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.local_offer),
-            title: Text(l10n.couponsAdmin),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/admin/coupons'),
-          ),
-          const Divider(),
           config.when(
             loading: () => const Padding(
               padding: EdgeInsets.all(24),
@@ -172,8 +120,21 @@ class AdminPanelScreen extends ConsumerWidget {
             error: (e, _) => ListTile(title: Text(apiErrorMessage(e))),
             data: (c) => Column(
               children: [
+                ListTile(
+                  leading: const Icon(Icons.dns),
+                  title: Text(l10n.serverUrlLabel),
+                  subtitle: Text(
+                    c.serverUrl?.isNotEmpty == true
+                        ? c.serverUrl!
+                        : l10n.notSetLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _editServerUrl(context, ref, c),
+                ),
                 SwitchListTile(
-                  secondary: const Icon(Icons.dns),
+                  secondary: const Icon(Icons.edit_attributes),
                   title: Text(l10n.allowServerUrlToggle),
                   subtitle: Text(l10n.allowServerUrlToggleHint),
                   value: c.allowServerUrlChange,

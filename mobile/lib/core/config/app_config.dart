@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../network/api_client.dart';
+import 'server_url.dart';
 
 class AppConfig {
   const AppConfig({
     required this.allowServerUrlChange,
+    this.serverUrl,
     this.promoEnabled = true,
     this.promoTitle,
     this.promoSubtitle,
@@ -31,6 +33,9 @@ class AppConfig {
   });
 
   final bool allowServerUrlChange;
+
+  /// Admin-configured backend URL the whole fleet follows; null = unset.
+  final String? serverUrl;
   final bool promoEnabled;
   final String? promoTitle;
   final String? promoSubtitle;
@@ -83,8 +88,15 @@ final appConfigProvider = FutureProvider.autoDispose<AppConfig>((ref) async {
   try {
     final res = await dio.get<Map<String, dynamic>>('/api/v1/app-config');
     final data = unwrapEnvelope(res) as Map<String, dynamic>;
+    // Admin server settings apply fleet-wide: persist them so the app
+    // follows the admin URL from the next request on (and after restart).
+    await ref.read(serverUrlProvider.notifier).applyAdminConfig(
+          serverUrl: data['server_url'] as String?,
+          allowChange: data['allow_server_url_change'] as bool? ?? true,
+        );
     return AppConfig(
       allowServerUrlChange: data['allow_server_url_change'] as bool? ?? true,
+      serverUrl: data['server_url'] as String?,
       promoEnabled: data['promo_enabled'] as bool? ?? true,
       promoTitle: data['promo_title'] as String?,
       promoSubtitle: data['promo_subtitle'] as String?,

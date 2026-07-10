@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/auth/auth_controller.dart';
 import '../../core/widgets/bot_avatar.dart';
 import '../../l10n/gen/app_localizations.dart';
+import '../admin/presentation/admin_dashboard_screen.dart';
 import '../bookings/presentation/bookings_screen.dart';
 import '../home/presentation/home_screen.dart';
 import '../jobs/presentation/jobs_screen.dart';
@@ -14,8 +15,10 @@ import '../profile/presentation/profile_screen.dart';
 import 'current_tab.dart';
 
 /// Bottom-navigation shell: Home · Bookings · Jobs (workers) · Profile.
-/// First login is gated: name/address/T&C must be completed before the
-/// tabs unlock (PRODUCT.md — real-world onboarding).
+/// Admins are staff, not customers — they get Dashboard · Profile instead
+/// (no booking, no services). First login is gated: name/address/T&C must
+/// be completed before the tabs unlock (PRODUCT.md — real-world
+/// onboarding).
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
 
@@ -35,12 +38,14 @@ class MainShell extends ConsumerWidget {
             me['terms_accepted'] != true,
         orElse: () => false); // fail-open while loading/offline
     if (incomplete) return const CompleteProfileScreen();
-    final pages = [
-      const HomeScreen(),
-      const BookingsScreen(),
-      if (isWorker) const JobsScreen(),
-      const ProfileScreen(),
-    ];
+    final pages = isAdmin
+        ? const [AdminDashboardScreen(), ProfileScreen()]
+        : [
+            const HomeScreen(),
+            const BookingsScreen(),
+            if (isWorker) const JobsScreen(),
+            const ProfileScreen(),
+          ];
     final tab =
         ref.watch(currentTabProvider).clamp(0, pages.length - 1);
 
@@ -63,22 +68,30 @@ class MainShell extends ConsumerWidget {
         onDestinationSelected: (i) =>
             ref.read(currentTabProvider.notifier).state = i,
         destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.home_outlined),
-            selectedIcon: const Icon(Icons.home),
-            label: l10n.navHome,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.receipt_long_outlined),
-            selectedIcon: const Icon(Icons.receipt_long),
-            label: l10n.navBookings,
-          ),
-          if (isWorker)
+          if (isAdmin)
             NavigationDestination(
-              icon: const Icon(Icons.work_outline),
-              selectedIcon: const Icon(Icons.work),
-              label: l10n.navJobs,
+              icon: const Icon(Icons.dashboard_outlined),
+              selectedIcon: const Icon(Icons.dashboard),
+              label: l10n.adminDashboard,
+            )
+          else ...[
+            NavigationDestination(
+              icon: const Icon(Icons.home_outlined),
+              selectedIcon: const Icon(Icons.home),
+              label: l10n.navHome,
             ),
+            NavigationDestination(
+              icon: const Icon(Icons.receipt_long_outlined),
+              selectedIcon: const Icon(Icons.receipt_long),
+              label: l10n.navBookings,
+            ),
+            if (isWorker)
+              NavigationDestination(
+                icon: const Icon(Icons.work_outline),
+                selectedIcon: const Icon(Icons.work),
+                label: l10n.navJobs,
+              ),
+          ],
           NavigationDestination(
             icon: const Icon(Icons.person_outline),
             selectedIcon: const Icon(Icons.person),

@@ -10,6 +10,7 @@ use crate::middleware::auth::CurrentUser;
 use crate::state::AppState;
 
 const ALLOW_SERVER_URL_CHANGE: &str = "allow_server_url_change";
+const SERVER_URL: &str = "server_url";
 const PROMO_BANNER: &str = "promo_banner";
 const MAINTENANCE_MODE: &str = "maintenance_mode";
 const MIN_BUILD: &str = "min_build";
@@ -51,6 +52,9 @@ async fn get_str(state: &AppState, key: &str) -> Result<Option<String>, AppError
 #[derive(Debug, Serialize)]
 pub struct AppConfig {
     pub allow_server_url_change: bool,
+    /// Admin-configured backend URL every app follows; None = unset
+    /// (apps keep their built-in default).
+    pub server_url: Option<String>,
     pub promo_enabled: bool,
     pub promo_title: Option<String>,
     pub promo_subtitle: Option<String>,
@@ -121,6 +125,7 @@ async fn load(state: &AppState) -> Result<AppConfig, AppError> {
         .unwrap_or(5);
     Ok(AppConfig {
         allow_server_url_change: allow,
+        server_url: get_str(state, SERVER_URL).await?,
         promo_enabled: promo
             .as_ref()
             .and_then(|p| p.get("enabled"))
@@ -179,6 +184,8 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<ApiResponse<AppCo
 #[derive(Deserialize)]
 pub struct UpdateAppConfig {
     pub allow_server_url_change: Option<bool>,
+    /// Set/update the fleet server URL; empty string unsets it.
+    pub server_url: Option<String>,
     pub promo_enabled: Option<bool>,
     pub promo_title: Option<String>,
     pub promo_subtitle: Option<String>,
@@ -262,6 +269,7 @@ pub async fn update(
     }
     // Free-text branding fields: an empty string clears back to defaults.
     for (key, value) in [
+        (SERVER_URL, &body.server_url),
         (CITY_LABEL, &body.city_label),
         (APP_DISPLAY_NAME, &body.app_display_name),
         (TAGLINE, &body.tagline),

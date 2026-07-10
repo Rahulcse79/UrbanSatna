@@ -96,15 +96,9 @@ class ProfileScreen extends ConsumerWidget {
                     current: data['full_name'] as String? ?? ''),
               ),
               // Separation of duties: staff accounts never join the
-              // marketplace as workers (enforced server-side too).
+              // marketplace as workers (enforced server-side too). The
+              // admin's tools live on their Dashboard tab, not here.
               if (!isWorker && !isAdmin) const _WorkerApplicationTile(),
-              if (isAdmin)
-                ListTile(
-                  leading: const Icon(Icons.admin_panel_settings),
-                  title: Text(l10n.adminPanel),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/admin'),
-                ),
               Consumer(builder: (context, ref, _) {
                 final config = ref.watch(appConfigProvider).maybeWhen(
                     data: (c) => c, orElse: () => null);
@@ -132,17 +126,21 @@ class ProfileScreen extends ConsumerWidget {
                   ],
                 );
               }),
-              ListTile(
-                leading: const Icon(Icons.report_problem_outlined),
-                title: Text(l10n.reportProblem),
-                onTap: () => _reportProblem(context, ref),
-              ),
-              ListTile(
-                leading: const Icon(Icons.confirmation_number_outlined),
-                title: Text(l10n.myTickets),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/tickets'),
-              ),
+              // Tickets are a customer/worker channel; admins answer them
+              // from the dashboard instead of raising their own.
+              if (!isAdmin) ...[
+                ListTile(
+                  leading: const Icon(Icons.report_problem_outlined),
+                  title: Text(l10n.reportProblem),
+                  onTap: () => _reportProblem(context, ref),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.confirmation_number_outlined),
+                  title: Text(l10n.myTickets),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/tickets'),
+                ),
+              ],
               ListTile(
                 leading: const Icon(Icons.settings),
                 title: Text(l10n.settingsTitle),

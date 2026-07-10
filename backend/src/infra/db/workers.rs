@@ -94,14 +94,29 @@ pub async fn latest_for_user(
     .await?)
 }
 
-/// Admin review queue, oldest first so nobody waits forever.
-pub async fn list(pg: &PgPool, status: &str) -> Result<Vec<WorkerApplication>, AppError> {
-    Ok(sqlx::query_as::<_, WorkerApplication>(&format!(
-        "{SELECT} WHERE a.status = $1 ORDER BY a.created_at ASC"
+/// Admin review queue, one page (10): pending oldest-first so nobody
+/// waits forever, decided queues newest-first.
+pub async fn list(
+    pg: &PgPool,
+    status: &str,
+    page: i64,
+) -> Result<(Vec<WorkerApplication>, i64), AppError> {
+    let total: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM worker_applications WHERE status = $1")
+            .bind(status)
+            .fetch_one(pg)
+            .await?;
+    let items = sqlx::query_as::<_, WorkerApplication>(&format!(
+        "{SELECT} WHERE a.status = $1
+         ORDER BY CASE WHEN a.status = 'pending' THEN a.created_at END ASC,
+                  a.created_at DESC
+         LIMIT 10 OFFSET $2"
     ))
     .bind(status)
+    .bind((page - 1).max(0) * 10)
     .fetch_all(pg)
-    .await?)
+    .await?;
+    Ok((items, total))
 }
 
 /// Attaches a KYC photo to the user's pending application.

@@ -266,5 +266,13 @@
   },
   "priorityUrgent": "Urgent",
   "priorityWaiting": "Waiting",
-  "cancel": "Cancel"
+  "cancel": "Cancel",
+  "viewProfile": "View profile",
+  "pendingLabel": "Pending",
+  "adminDashboard": "Dashboard",
+  "quickActions": "Quick actions",
+  "appSettingsTitle": "App settings",
+  "notSetLabel": "Not set",
+  "unsetLabel": "Unset",
+  "serverUrlAdminHint": "All apps follow this URL. Leave empty to let apps use their built-in default."
 }

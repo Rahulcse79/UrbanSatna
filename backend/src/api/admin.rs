@@ -223,21 +223,29 @@ pub async fn kyc_image(
 pub struct QueueQuery {
     #[serde(default)]
     pub status: Option<String>, // pending (default) | approved | rejected
+    #[serde(default)]
+    pub page: Option<i64>,
 }
 
+/// Approval queue, paginated 10/page (perm workers:verify).
 pub async fn list_worker_applications(
     State(state): State<AppState>,
     current: CurrentUser,
     Query(q): Query<QueueQuery>,
-) -> Result<Json<ApiResponse<Vec<workers::WorkerApplication>>>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     current.require_perm("workers:verify")?;
     let status = q.status.as_deref().unwrap_or("pending");
     if !matches!(status, "pending" | "approved" | "rejected") {
         return Err(AppError::Validation("invalid status filter".into()));
     }
-    Ok(Json(ApiResponse::ok(
-        workers::list(&state.pg, status).await?,
-    )))
+    let page = q.page.unwrap_or(1).max(1);
+    let (items, total) = workers::list(&state.pg, status, page).await?;
+    Ok(Json(ApiResponse::ok(json!({
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": 10,
+    }))))
 }
 
 #[derive(Deserialize)]

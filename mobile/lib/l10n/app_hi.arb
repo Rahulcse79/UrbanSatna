@@ -259,5 +259,13 @@
   "servicesCountLabel": "{count, plural, =0{कोई सेवा नहीं} =1{1 सेवा} other{{count} सेवाएँ}}",
   "priorityUrgent": "अत्यावश्यक",
   "priorityWaiting": "प्रतीक्षारत",
-  "cancel": "रद्द करें"
+  "cancel": "रद्द करें",
+  "viewProfile": "प्रोफ़ाइल देखें",
+  "pendingLabel": "लंबित",
+  "adminDashboard": "डैशबोर्ड",
+  "quickActions": "त्वरित कार्य",
+  "appSettingsTitle": "ऐप सेटिंग्स",
+  "notSetLabel": "सेट नहीं",
+  "unsetLabel": "हटाएँ",
+  "serverUrlAdminHint": "सभी ऐप इसी URL का उपयोग करेंगे। खाली छोड़ने पर ऐप अपना डिफ़ॉल्ट उपयोग करेंगे।"
 }
