@@ -50,26 +50,48 @@ pub async fn search(
     )))
 }
 
-/// Admin view: also returns deactivated rows so they can be re-enabled.
+#[derive(Deserialize)]
+pub struct PageQuery {
+    #[serde(default)]
+    pub page: Option<i64>,
+}
+
+/// Admin view: paginated (10/page), also returns deactivated rows so they
+/// can be re-enabled. prev/next are driven by `total`.
 pub async fn list_categories_admin(
     State(state): State<AppState>,
     current: CurrentUser,
-) -> Result<Json<ApiResponse<Vec<catalog::Category>>>, AppError> {
+    Query(query): Query<PageQuery>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     current.require_perm("catalog:manage")?;
-    Ok(Json(ApiResponse::ok(
-        catalog::list_categories_all(&state.pg).await?,
-    )))
+    let page = query.page.unwrap_or(1).max(1);
+    let items = catalog::list_categories_page(&state.pg, page, 10).await?;
+    let total = items.first().map(|c| c.total).unwrap_or(0);
+    Ok(Json(ApiResponse::ok(json!({
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": 10,
+    }))))
 }
 
+/// Admin services for one category, paginated (10/page).
 pub async fn list_services_admin(
     State(state): State<AppState>,
     current: CurrentUser,
     Path(category_id): Path<Uuid>,
-) -> Result<Json<ApiResponse<Vec<catalog::Service>>>, AppError> {
+    Query(query): Query<PageQuery>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     current.require_perm("catalog:manage")?;
-    Ok(Json(ApiResponse::ok(
-        catalog::list_services_all(&state.pg, category_id).await?,
-    )))
+    let page = query.page.unwrap_or(1).max(1);
+    let items = catalog::list_services_page(&state.pg, category_id, page, 10).await?;
+    let total = items.first().map(|s| s.total).unwrap_or(0);
+    Ok(Json(ApiResponse::ok(json!({
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": 10,
+    }))))
 }
 
 #[derive(Deserialize)]

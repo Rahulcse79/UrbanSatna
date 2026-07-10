@@ -50,22 +50,77 @@ pub async fn list_services(pg: &PgPool, category_id: Uuid) -> Result<Vec<Service
     .await?)
 }
 
-/// Admin listing: includes deactivated rows so they can be re-enabled.
-pub async fn list_categories_all(pg: &PgPool) -> Result<Vec<Category>, AppError> {
-    Ok(sqlx::query_as::<_, Category>(&format!(
-        "SELECT {CATEGORY_COLS} FROM categories
-         WHERE deleted_at IS NULL ORDER BY sort_order, name"
-    ))
+/// Admin category row: enriched with the count of its (non-deleted)
+/// services so the card can show it without an extra request per row.
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct AdminCategory {
+    pub id: Uuid,
+    pub name: String,
+    pub icon: Option<String>,
+    pub sort_order: i32,
+    pub is_active: bool,
+    pub service_count: i64,
+    /// Same value on every row of a page — drives prev/next.
+    #[serde(skip_serializing)]
+    pub total: i64,
+}
+
+/// Admin listing, one page: includes deactivated rows so they can be
+/// re-enabled. Server-side pagination keeps the payload to `per_page`.
+pub async fn list_categories_page(
+    pg: &PgPool,
+    page: i64,
+    per_page: i64,
+) -> Result<Vec<AdminCategory>, AppError> {
+    Ok(sqlx::query_as::<_, AdminCategory>(
+        "SELECT c.id, c.name, c.icon, c.sort_order, c.is_active,
+                (SELECT count(*) FROM services s
+                   WHERE s.category_id = c.id AND s.deleted_at IS NULL)
+                    AS service_count,
+                count(*) OVER() AS total
+         FROM categories c
+         WHERE c.deleted_at IS NULL
+         ORDER BY c.sort_order, c.name
+         LIMIT $1 OFFSET $2",
+    )
+    .bind(per_page)
+    .bind((page - 1).max(0) * per_page)
     .fetch_all(pg)
     .await?)
 }
 
-pub async fn list_services_all(pg: &PgPool, category_id: Uuid) -> Result<Vec<Service>, AppError> {
-    Ok(sqlx::query_as::<_, Service>(&format!(
-        "SELECT {SERVICE_COLS} FROM services
-         WHERE category_id = $1 AND deleted_at IS NULL ORDER BY name"
-    ))
+/// A service row plus the page's total (window count) for pagination.
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct AdminService {
+    pub id: Uuid,
+    pub category_id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub base_price_paise: i64,
+    pub duration_min: i32,
+    pub is_active: bool,
+    #[serde(skip_serializing)]
+    pub total: i64,
+}
+
+/// Admin listing for one category, one page (includes deactivated rows).
+pub async fn list_services_page(
+    pg: &PgPool,
+    category_id: Uuid,
+    page: i64,
+    per_page: i64,
+) -> Result<Vec<AdminService>, AppError> {
+    Ok(sqlx::query_as::<_, AdminService>(
+        "SELECT id, category_id, name, description, base_price_paise,
+                duration_min, is_active, count(*) OVER() AS total
+         FROM services
+         WHERE category_id = $1 AND deleted_at IS NULL
+         ORDER BY name
+         LIMIT $2 OFFSET $3",
+    )
     .bind(category_id)
+    .bind(per_page)
+    .bind((page - 1).max(0) * per_page)
     .fetch_all(pg)
     .await?)
 }

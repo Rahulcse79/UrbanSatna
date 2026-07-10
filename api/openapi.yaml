@@ -404,15 +404,15 @@ paths:
     get:
       tags: [admin]
       security: [{ bearerAuth: [] }]
-      summary: All categories incl. deactivated (perm catalog:manage)
-      responses: { "200": { description: "[Category]" } }
+      summary: "Categories incl. deactivated, 10/page (?page=; perm catalog:manage). Item adds service_count to Category"
+      responses: { "200": { description: "{items, total, page, per_page}" } }
   /api/v1/admin/catalog/categories/{id}/services:
     get:
       tags: [admin]
       security: [{ bearerAuth: [] }]
-      summary: All services of a category incl. deactivated (perm catalog:manage)
+      summary: "Services of a category incl. deactivated, 10/page (?page=; perm catalog:manage)"
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { "200": { description: "[Service]" } }
+      responses: { "200": { description: "{items, total, page, per_page}" } }
 
 components:
   securitySchemes:

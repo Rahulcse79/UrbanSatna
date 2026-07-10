@@ -5,12 +5,14 @@ import '../../../core/network/api_client.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../catalog/data/catalog_repository.dart';
 import '../../home/presentation/home_screen.dart' show categoryIcon;
+import 'catalog_services_screen.dart';
 
 class AdminCategory {
   const AdminCategory({
     required this.id,
     required this.name,
     required this.isActive,
+    required this.serviceCount,
     this.icon,
   });
 
@@ -18,103 +20,101 @@ class AdminCategory {
         id: json['id'] as String,
         name: json['name'] as String,
         isActive: json['is_active'] as bool? ?? true,
+        serviceCount: json['service_count'] as int? ?? 0,
         icon: json['icon'] as String?,
       );
 
   final String id;
   final String name;
   final bool isActive;
+  final int serviceCount;
   final String? icon;
 }
 
-class AdminService {
-  const AdminService({
-    required this.id,
-    required this.name,
-    required this.pricePaise,
-    required this.durationMin,
-    required this.isActive,
-  });
-
-  factory AdminService.fromJson(Map<String, dynamic> json) => AdminService(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        pricePaise: json['base_price_paise'] as int,
-        durationMin: json['duration_min'] as int,
-        isActive: json['is_active'] as bool? ?? true,
-      );
-
-  final String id;
-  final String name;
-  final int pricePaise;
-  final int durationMin;
-  final bool isActive;
-
-  String get priceLabel => '₹${(pricePaise / 100).toStringAsFixed(0)}';
-}
+typedef CategoriesPage = ({List<AdminCategory> items, int total, int page});
 
 final adminCategoriesProvider =
-    FutureProvider.autoDispose<List<AdminCategory>>((ref) async {
-  final dio = ref.watch(dioProvider);
-  final res =
-      await dio.get<Map<String, dynamic>>('/api/v1/admin/catalog/categories');
-  final data = unwrapEnvelope(res) as List<dynamic>;
-  return data
-      .map((c) => AdminCategory.fromJson(c as Map<String, dynamic>))
-      .toList();
-});
-
-final adminServicesProvider = FutureProvider.autoDispose
-    .family<List<AdminService>, String>((ref, categoryId) async {
+    FutureProvider.autoDispose.family<CategoriesPage, int>((ref, page) async {
   final dio = ref.watch(dioProvider);
   final res = await dio.get<Map<String, dynamic>>(
-      '/api/v1/admin/catalog/categories/$categoryId/services');
-  final data = unwrapEnvelope(res) as List<dynamic>;
-  return data
-      .map((s) => AdminService.fromJson(s as Map<String, dynamic>))
-      .toList();
+      '/api/v1/admin/catalog/categories?page=$page');
+  final data = unwrapEnvelope(res) as Map<String, dynamic>;
+  return (
+    items: (data['items'] as List<dynamic>)
+        .map((c) => AdminCategory.fromJson(c as Map<String, dynamic>))
+        .toList(),
+    total: data['total'] as int,
+    page: data['page'] as int,
+  );
 });
 
 /// Admin: the catalog is pure data — add or switch off categories and
 /// services from the phone, live for every user (CLAUDE.md rule 2).
-class CatalogManagerScreen extends ConsumerWidget {
+/// Categories paginate 10/page; tap one to manage its services.
+class CatalogManagerScreen extends ConsumerStatefulWidget {
   const CatalogManagerScreen({super.key});
 
-  void _refresh(WidgetRef ref) {
+  @override
+  ConsumerState<CatalogManagerScreen> createState() =>
+      _CatalogManagerScreenState();
+}
+
+class _CatalogManagerScreenState extends ConsumerState<CatalogManagerScreen> {
+  int _page = 1;
+
+  void _refresh() {
     ref.invalidate(adminCategoriesProvider);
     ref.invalidate(categoriesProvider);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final categories = ref.watch(adminCategoriesProvider);
+    final categories = ref.watch(adminCategoriesProvider(_page));
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.manageCatalog)),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: Text(l10n.addCategory),
-        onPressed: () => _addCategory(context, ref),
+        onPressed: _addCategory,
       ),
-      body: categories.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(apiErrorMessage(e))),
-        data: (items) => RefreshIndicator(
-          onRefresh: () async => _refresh(ref),
-          child: ListView(
-            padding: const EdgeInsets.only(bottom: 88),
-            children: [
-              for (final category in items)
-                _CategoryTile(category: category, onChanged: () => _refresh(ref)),
-            ],
+      body: Column(
+        children: [
+          Expanded(
+            child: categories.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text(apiErrorMessage(e))),
+              data: (page) => RefreshIndicator(
+                onRefresh: () async => _refresh(),
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                  itemCount: page.items.length,
+                  itemBuilder: (context, i) => _CategoryCard(
+                    category: page.items[i],
+                    onChanged: _refresh,
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
+          SafeArea(
+            child: categories.maybeWhen(
+              data: (page) => CatalogPager(
+                page: _page,
+                total: page.total,
+                onPrev: () => setState(() => _page--),
+                onNext: () => setState(() => _page++),
+              ),
+              orElse: () => const SizedBox.shrink(),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Future<void> _addCategory(BuildContext context, WidgetRef ref) async {
+  Future<void> _addCategory() async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final name = TextEditingController();
@@ -167,15 +167,17 @@ class CatalogManagerScreen extends ConsumerWidget {
           if (icon.text.trim().isNotEmpty) 'icon': icon.text.trim(),
         },
       );
-      _refresh(ref);
+      _refresh();
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
     }
   }
 }
 
-class _CategoryTile extends ConsumerWidget {
-  const _CategoryTile({required this.category, required this.onChanged});
+/// A category as a card: coloured icon, name, service count + status,
+/// active toggle; the body opens the category's services.
+class _CategoryCard extends ConsumerWidget {
+  const _CategoryCard({required this.category, required this.onChanged});
 
   final AdminCategory category;
   final VoidCallback onChanged;
@@ -183,175 +185,149 @@ class _CategoryTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final services = ref.watch(adminServicesProvider(category.id));
-    return ExpansionTile(
-      leading: Icon(categoryIcon(category.icon)),
-      title: Text(
-        category.name,
-        style: TextStyle(
-          decoration: category.isActive ? null : TextDecoration.lineThrough,
-        ),
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final accent = category.isActive ? scheme.primary : scheme.outline;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
       ),
-      trailing: Switch(
-        value: category.isActive,
-        onChanged: (v) async {
-          final messenger = ScaffoldMessenger.of(context);
-          try {
-            await ref.read(dioProvider).patch<Map<String, dynamic>>(
-              '/api/v1/categories/${category.id}',
-              data: {'is_active': v},
-            );
-            onChanged();
-          } catch (e) {
-            messenger
-                .showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
-          }
-        },
-      ),
-      children: [
-        services.when(
-          loading: () => const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CatalogServicesScreen(
+              categoryId: category.id,
+              categoryName: category.name,
+            ),
           ),
-          error: (e, _) => ListTile(title: Text(apiErrorMessage(e))),
-          data: (items) => Column(
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
             children: [
-              for (final service in items)
-                ListTile(
-                  dense: true,
-                  title: Text(
-                    service.name,
-                    style: TextStyle(
-                      decoration:
-                          service.isActive ? null : TextDecoration.lineThrough,
-                    ),
-                  ),
-                  subtitle: Text(
-                      '${service.priceLabel} · ${service.durationMin} min'),
-                  trailing: Switch(
-                    value: service.isActive,
-                    onChanged: (v) async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      try {
-                        await ref.read(dioProvider).patch<Map<String, dynamic>>(
-                          '/api/v1/services/${service.id}',
-                          data: {'is_active': v},
-                        );
-                        ref.invalidate(adminServicesProvider(category.id));
-                      } catch (e) {
-                        messenger.showSnackBar(
-                            SnackBar(content: Text(apiErrorMessage(e))));
-                      }
-                    },
-                  ),
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-              ListTile(
-                dense: true,
-                leading: const Icon(Icons.add),
-                title: Text(l10n.addService),
-                onTap: () => _addService(context, ref),
+                child: Icon(categoryIcon(category.icon), color: accent),
               ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      category.name,
+                      style: text.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        decoration: category.isActive
+                            ? null
+                            : TextDecoration.lineThrough,
+                        color: category.isActive
+                            ? null
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Text(
+                          l10n.servicesCountLabel(category.serviceCount),
+                          style: text.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                        Text('  ·  ',
+                            style: text.bodySmall
+                                ?.copyWith(color: scheme.outline)),
+                        Text(
+                          category.isActive
+                              ? l10n.activeLabel
+                              : l10n.inactiveLabel,
+                          style: text.bodySmall?.copyWith(
+                            color: category.isActive
+                                ? Colors.green.shade600
+                                : scheme.outline,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: category.isActive,
+                onChanged: (v) async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  try {
+                    await ref.read(dioProvider).patch<Map<String, dynamic>>(
+                      '/api/v1/categories/${category.id}',
+                      data: {'is_active': v},
+                    );
+                    onChanged();
+                  } catch (e) {
+                    messenger.showSnackBar(
+                        SnackBar(content: Text(apiErrorMessage(e))));
+                  }
+                },
+              ),
+              Icon(Icons.chevron_right, color: scheme.outline),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
+}
 
-  Future<void> _addService(BuildContext context, WidgetRef ref) async {
+/// Shared Prev / "page / lastPage" / Next control (10 rows per page).
+class CatalogPager extends StatelessWidget {
+  const CatalogPager({
+    super.key,
+    required this.page,
+    required this.total,
+    required this.onPrev,
+    required this.onNext,
+  });
+
+  final int page;
+  final int total;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    final name = TextEditingController();
-    final price = TextEditingController();
-    final duration = TextEditingController(text: '60');
-    final description = TextEditingController();
-    final submitted = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.addService),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: name,
-                decoration: InputDecoration(
-                  labelText: l10n.serviceNameLabel,
-                  filled: true,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: price,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: l10n.priceRupeesLabel,
-                  filled: true,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: duration,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: l10n.durationMinLabel,
-                  filled: true,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: description,
-                decoration: InputDecoration(
-                  labelText: l10n.descriptionLabel,
-                  filled: true,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none),
-                ),
-              ),
-            ],
+    final lastPage = (total / 10).ceil().clamp(1, 99999);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.chevron_left, size: 18),
+            label: Text(l10n.prevLabel),
+            onPressed: page > 1 ? onPrev : null,
           ),
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l10n.save),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('$page / $lastPage',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.chevron_right, size: 18),
+            label: Text(l10n.nextLabel),
+            onPressed: page < lastPage ? onNext : null,
           ),
         ],
       ),
     );
-    if (submitted != true || name.text.trim().isEmpty) return;
-    final rupees = double.tryParse(price.text.trim());
-    final minutes = int.tryParse(duration.text.trim()) ?? 60;
-    if (rupees == null || rupees <= 0) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.invalidNumber)));
-      return;
-    }
-    try {
-      await ref.read(dioProvider).post<Map<String, dynamic>>(
-        '/api/v1/services',
-        data: {
-          'category_id': category.id,
-          'name': name.text.trim(),
-          'base_price_paise': (rupees * 100).round(),
-          'duration_min': minutes,
-          if (description.text.trim().isNotEmpty)
-            'description': description.text.trim(),
-        },
-      );
-      ref.invalidate(adminServicesProvider(category.id));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
-    }
   }
 }

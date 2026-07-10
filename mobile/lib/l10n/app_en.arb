@@ -253,5 +253,15 @@
   "viewDocuments": "View documents",
   "kycDocLabel": "ID document",
   "kycSelfieLabel": "Selfie",
-  "notUploadedLabel": "Not uploaded"
+  "notUploadedLabel": "Not uploaded",
+  "activeLabel": "Active",
+  "inactiveLabel": "Inactive",
+  "servicesCountLabel": "{count, plural, =0{No services} =1{1 service} other{{count} services}}",
+  "@servicesCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }
