@@ -248,5 +248,10 @@
   "serverLabelShort": "सर्वर",
   "save": "सहेजें",
   "resetToDefault": "डिफ़ॉल्ट पर रीसेट करें",
-  "setServerUrl": "सर्वर URL सेट करें"
+  "setServerUrl": "सर्वर URL सेट करें",
+  "documentsTitle": "दस्तावेज़",
+  "viewDocuments": "दस्तावेज़ देखें",
+  "kycDocLabel": "पहचान दस्तावेज़",
+  "kycSelfieLabel": "सेल्फ़ी",
+  "notUploadedLabel": "अपलोड नहीं हुआ"
 }

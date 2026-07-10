@@ -371,6 +371,20 @@ paths:
       summary: "Approve/reject: {approve: bool, note?}. Approval grants the worker role atomically."
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { "200": { description: decided }, "409": { description: already decided } }
+  /api/v1/admin/users:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: "User directory, 10/page (?page=&q= matches phone/name; perm users:manage:any). Item: {id, phone, full_name?, email?, city?, address?, state?, pincode?, is_blocked, block_reason?, has_avatar, roles[], application_id?, application_status?, has_kyc_doc, has_kyc_selfie, created_at}"
+      responses: { "200": { description: "{items, total, page, per_page}" } }
+  /api/v1/admin/users/{id}/avatar:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: "User profile photo bytes (perm users:manage:any)"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses: { "200": { description: image }, "404": { description: none } }
   /api/v1/admin/worker-applications/{id}/kyc/{kind}:
     get:
       tags: [admin]

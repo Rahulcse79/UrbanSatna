@@ -120,6 +120,7 @@ pub fn router(state: AppState) -> Router {
         .route("/admin/stats", get(admin::stats))
         .route("/admin/users/unlock-login", post(admin::unlock_login))
         .route("/admin/users", get(admin::list_users))
+        .route("/admin/users/{id}/avatar", get(admin::user_avatar))
         .route("/admin/users/{id}/block", post(admin::block_user))
         .route("/admin/users/{id}/unblock", post(admin::unblock_user))
         .route("/admin/audit", get(admin::audit_logs))

@@ -76,6 +76,19 @@ pub async fn list_users(
     }))))
 }
 
+/// A user's profile photo for the directory (perm users:manage:any).
+pub async fn user_avatar(
+    State(state): State<AppState>,
+    current: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<Response, AppError> {
+    current.require_perm("users:manage:any")?;
+    match users::avatar(&state.pg, id).await? {
+        Some((bytes, mime)) => Ok(([(header::CONTENT_TYPE, mime)], bytes).into_response()),
+        None => Ok(StatusCode::NOT_FOUND.into_response()),
+    }
+}
+
 #[derive(Deserialize, Default)]
 pub struct BlockBody {
     pub reason: Option<String>,

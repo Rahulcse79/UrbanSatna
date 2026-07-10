@@ -140,10 +140,21 @@ pub struct AdminUser {
     pub id: Uuid,
     pub phone: String,
     pub full_name: Option<String>,
+    pub email: Option<String>,
     pub city: Option<String>,
+    pub address: Option<String>,
+    pub state: Option<String>,
+    pub pincode: Option<String>,
     pub is_blocked: bool,
     pub block_reason: Option<String>,
+    pub has_avatar: bool,
     pub roles: Vec<String>,
+    /// Latest worker application, if the user ever applied — KYC documents
+    /// hang off it, so the admin detail view links there.
+    pub application_id: Option<Uuid>,
+    pub application_status: Option<String>,
+    pub has_kyc_doc: bool,
+    pub has_kyc_selfie: bool,
     pub created_at: DateTime<Utc>,
     #[serde(skip_serializing)]
     pub total: i64,
@@ -157,18 +168,32 @@ pub async fn list_admin(
     q: &str,
 ) -> Result<Vec<AdminUser>, AppError> {
     Ok(sqlx::query_as::<_, AdminUser>(
-        "SELECT u.id, u.phone, u.full_name, u.city,
+        "SELECT u.id, u.phone, u.full_name, u.email, u.city, u.address,
+                u.state, u.pincode,
                 (u.blocked_at IS NOT NULL) AS is_blocked, u.block_reason,
+                (u.avatar IS NOT NULL) AS has_avatar,
                 COALESCE(array_agg(DISTINCT r.name)
                     FILTER (WHERE r.name IS NOT NULL), '{}') AS roles,
+                wa.id AS application_id, wa.status AS application_status,
+                COALESCE(wa.has_doc, false) AS has_kyc_doc,
+                COALESCE(wa.has_selfie, false) AS has_kyc_selfie,
                 u.created_at, count(*) OVER() AS total
          FROM users u
          LEFT JOIN user_roles ur ON ur.user_id = u.id
          LEFT JOIN roles r ON r.id = ur.role_id
+         LEFT JOIN LATERAL (
+             SELECT id, status,
+                    (kyc_doc IS NOT NULL) AS has_doc,
+                    (kyc_selfie IS NOT NULL) AS has_selfie
+             FROM worker_applications
+             WHERE user_id = u.id
+             ORDER BY created_at DESC
+             LIMIT 1
+         ) wa ON true
          WHERE u.deleted_at IS NULL
            AND ($3 = '' OR u.phone ILIKE '%' || $3 || '%'
                         OR u.full_name ILIKE '%' || $3 || '%')
-         GROUP BY u.id
+         GROUP BY u.id, wa.id, wa.status, wa.has_doc, wa.has_selfie
          ORDER BY u.created_at DESC
          LIMIT $1 OFFSET $2",
     )
@@ -177,6 +202,20 @@ pub async fn list_admin(
     .bind(q)
     .fetch_all(pg)
     .await?)
+}
+
+/// A user's profile photo for the admin directory; None when unset.
+pub async fn avatar(pg: &PgPool, id: Uuid) -> Result<Option<(Vec<u8>, String)>, AppError> {
+    let row: Option<(Option<Vec<u8>>, Option<String>)> = sqlx::query_as(
+        "SELECT avatar, avatar_mime FROM users WHERE id = $1 AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .fetch_optional(pg)
+    .await?;
+    Ok(match row {
+        Some((Some(bytes), Some(mime))) => Some((bytes, mime)),
+        _ => None,
+    })
 }
 
 /// Blocking also kills every session so access tokens die at refresh.

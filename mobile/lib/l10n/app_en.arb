@@ -248,5 +248,10 @@
   "serverLabelShort": "Server",
   "save": "Save",
   "resetToDefault": "Reset to default",
-  "setServerUrl": "Set server URL"
+  "setServerUrl": "Set server URL",
+  "documentsTitle": "Documents",
+  "viewDocuments": "View documents",
+  "kycDocLabel": "ID document",
+  "kycSelfieLabel": "Selfie",
+  "notUploadedLabel": "Not uploaded"
 }
