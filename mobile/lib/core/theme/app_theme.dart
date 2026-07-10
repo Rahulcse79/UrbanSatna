@@ -1,3 +1,9 @@
+// CupertinoPageTransitionsBuilder moved from the material library to the
+// cupertino library across Flutter versions: current stable resolves it via
+// this import, while 3.27 (the newest toolchain the macOS-12 dev Mac can
+// run) still exports it from material and flags this import instead.
+// ignore: unused_import, undefined_shown_name
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
