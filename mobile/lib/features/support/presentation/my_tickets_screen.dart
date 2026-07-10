@@ -2,63 +2,91 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/page_bar.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../bookings/presentation/bookings_screen.dart' show formatTime;
 import '../data/tickets_repository.dart';
 
-/// Customer's raised issues with their resolution status.
-class MyTicketsScreen extends ConsumerWidget {
+/// Customer's raised issues with their resolution status, 10 per page.
+class MyTicketsScreen extends ConsumerStatefulWidget {
   const MyTicketsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyTicketsScreen> createState() => _MyTicketsScreenState();
+}
+
+class _MyTicketsScreenState extends ConsumerState<MyTicketsScreen> {
+  int _page = 1;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final tickets = ref.watch(myTicketsProvider);
+    final tickets = ref.watch(myTicketsProvider(_page));
     return Scaffold(
       appBar: AppBar(title: Text(l10n.myTickets)),
-      body: tickets.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(apiErrorMessage(e))),
-        data: (items) => RefreshIndicator(
-          onRefresh: () async => ref.invalidate(myTicketsProvider),
-          child: items.isEmpty
-              ? ListView(children: [
-                  const SizedBox(height: 120),
-                  Icon(Icons.support_agent,
-                      size: 56, color: Theme.of(context).colorScheme.outline),
-                  const SizedBox(height: 12),
-                  Center(child: Text(l10n.noTickets)),
-                ])
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) => TicketCard(
-                    ticket: items[i],
-                    // Reopen only while 'resolved' — a closed ticket is
-                    // the admin's final word.
-                    trailing: items[i].resolved
-                        ? OutlinedButton.icon(
-                            icon: const Icon(Icons.refresh, size: 18),
-                            label: Text(l10n.reopenTicket),
-                            onPressed: () async {
-                              final messenger =
-                                  ScaffoldMessenger.of(context);
-                              try {
-                                await ref
-                                    .read(ticketsRepositoryProvider)
-                                    .reopen(items[i].id);
-                                ref.invalidate(myTicketsProvider);
-                              } catch (e) {
-                                messenger.showSnackBar(SnackBar(
-                                    content: Text(apiErrorMessage(e))));
-                              }
-                            },
-                          )
-                        : null,
-                  ),
-                ),
-        ),
+      body: Column(
+        children: [
+          Expanded(
+            child: tickets.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text(apiErrorMessage(e))),
+              data: (page) => RefreshIndicator(
+                onRefresh: () async => ref.invalidate(myTicketsProvider),
+                child: page.items.isEmpty
+                    ? ListView(children: [
+                        const SizedBox(height: 120),
+                        Icon(Icons.support_agent,
+                            size: 56,
+                            color: Theme.of(context).colorScheme.outline),
+                        const SizedBox(height: 12),
+                        Center(child: Text(l10n.noTickets)),
+                      ])
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: page.items.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 10),
+                        itemBuilder: (context, i) => TicketCard(
+                          ticket: page.items[i],
+                          // Reopen only while 'resolved' — a closed ticket
+                          // is the admin's final word.
+                          trailing: page.items[i].resolved
+                              ? OutlinedButton.icon(
+                                  icon: const Icon(Icons.refresh, size: 18),
+                                  label: Text(l10n.reopenTicket),
+                                  onPressed: () async {
+                                    final messenger =
+                                        ScaffoldMessenger.of(context);
+                                    try {
+                                      await ref
+                                          .read(ticketsRepositoryProvider)
+                                          .reopen(page.items[i].id);
+                                      ref.invalidate(myTicketsProvider);
+                                    } catch (e) {
+                                      messenger.showSnackBar(SnackBar(
+                                          content:
+                                              Text(apiErrorMessage(e))));
+                                    }
+                                  },
+                                )
+                              : null,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: tickets.maybeWhen(
+              data: (page) => PageBar(
+                page: _page,
+                total: page.total,
+                onPrev: () => setState(() => _page--),
+                onNext: () => setState(() => _page++),
+              ),
+              orElse: () => const SizedBox.shrink(),
+            ),
+          ),
+        ],
       ),
     );
   }

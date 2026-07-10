@@ -280,8 +280,8 @@ paths:
     get:
       tags: [support]
       security: [{ bearerAuth: [] }]
-      summary: "Admin inbox: one row per conversation {user_id, phone, full_name?, last_body, last_at, awaiting_reply} (perm bookings:manage:any)"
-      responses: { "200": { description: "[SupportThread]" } }
+      summary: "Admin inbox: one row per conversation {user_id, phone, full_name?, last_body, last_at, awaiting_reply}, 10/page (?page=; perm bookings:manage:any)"
+      responses: { "200": { description: "{items, total, page, per_page}" } }
   /api/v1/admin/support/{user_id}/messages:
     get:
       tags: [support]
@@ -303,8 +303,8 @@ paths:
     get:
       tags: [bookings]
       security: [{ bearerAuth: [] }]
-      summary: My tickets with status + resolution
-      responses: { "200": { description: "[Ticket]" } }
+      summary: "My tickets with status + resolution, 10/page (?page=)"
+      responses: { "200": { description: "{items, total, page, per_page}" } }
   /api/v1/bookings/{id}/messages:
     get:
       tags: [bookings]
@@ -332,8 +332,8 @@ paths:
     get:
       tags: [admin]
       security: [{ bearerAuth: [] }]
-      summary: List coupons (perm catalog:manage)
-      responses: { "200": { description: "[Coupon]" } }
+      summary: "List coupons, 10/page newest first (?page=; perm catalog:manage)"
+      responses: { "200": { description: "{items, total, page, per_page}" } }
     post:
       tags: [admin]
       security: [{ bearerAuth: [] }]

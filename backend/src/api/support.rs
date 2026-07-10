@@ -1,4 +1,4 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::Deserialize;
 use uuid::Uuid;
@@ -79,13 +79,29 @@ pub async fn send(
     Ok(Json(ApiResponse::ok(message)))
 }
 
-/// Admin inbox: one row per conversation (perm bookings:manage:any).
+#[derive(Deserialize)]
+pub struct InboxQuery {
+    #[serde(default)]
+    pub page: Option<i64>,
+}
+
+/// Admin inbox: one row per conversation, paginated 10/page
+/// (perm bookings:manage:any).
 pub async fn threads(
     State(state): State<AppState>,
     current: CurrentUser,
-) -> Result<Json<ApiResponse<Vec<support::SupportThread>>>, AppError> {
+    Query(query): Query<InboxQuery>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     current.require_perm("bookings:manage:any")?;
-    Ok(Json(ApiResponse::ok(support::threads(&state.pg).await?)))
+    let page = query.page.unwrap_or(1).max(1);
+    let items = support::threads(&state.pg, page, 10).await?;
+    let total = items.first().map(|t| t.total).unwrap_or(0);
+    Ok(Json(ApiResponse::ok(serde_json::json!({
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": 10,
+    }))))
 }
 
 pub async fn admin_thread(

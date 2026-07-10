@@ -43,13 +43,26 @@ pub async fn create(
     Ok(Json(ApiResponse::ok(ticket)))
 }
 
+#[derive(Deserialize)]
+pub struct MineQuery {
+    #[serde(default)]
+    pub page: Option<i64>,
+}
+
+/// The customer's own tickets, paginated 10/page.
 pub async fn mine(
     State(state): State<AppState>,
     current: CurrentUser,
-) -> Result<Json<ApiResponse<Vec<tickets::Ticket>>>, AppError> {
-    Ok(Json(ApiResponse::ok(
-        tickets::mine(&state.pg, current.id).await?,
-    )))
+    Query(q): Query<MineQuery>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    let page = q.page.unwrap_or(1).max(1);
+    let (items, total) = tickets::mine(&state.pg, current.id, page).await?;
+    Ok(Json(ApiResponse::ok(json!({
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": 10,
+    }))))
 }
 
 #[derive(Deserialize)]

@@ -17,10 +17,32 @@ pub struct Coupon {
 
 const COLS: &str = "id, code, percent_off, flat_off_paise, is_active, created_at";
 
-pub async fn list(pg: &PgPool) -> Result<Vec<Coupon>, AppError> {
-    Ok(sqlx::query_as::<_, Coupon>(&format!(
-        "SELECT {COLS} FROM coupons ORDER BY created_at DESC"
+/// Admin coupon row: the page's total rides along (window count).
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct AdminCoupon {
+    pub id: Uuid,
+    pub code: String,
+    pub percent_off: Option<i32>,
+    pub flat_off_paise: Option<i64>,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing)]
+    pub total: i64,
+}
+
+/// Admin listing, one page (10), newest first.
+pub async fn list_page(
+    pg: &PgPool,
+    page: i64,
+    per_page: i64,
+) -> Result<Vec<AdminCoupon>, AppError> {
+    Ok(sqlx::query_as::<_, AdminCoupon>(&format!(
+        "SELECT {COLS}, count(*) OVER() AS total
+         FROM coupons ORDER BY created_at DESC
+         LIMIT $1 OFFSET $2"
     ))
+    .bind(per_page)
+    .bind((page - 1).max(0) * per_page)
     .fetch_all(pg)
     .await?)
 }

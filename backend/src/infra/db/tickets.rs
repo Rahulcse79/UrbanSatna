@@ -54,13 +54,21 @@ pub async fn get(pg: &PgPool, id: Uuid) -> Result<Ticket, AppError> {
         .ok_or(AppError::NotFound("ticket"))
 }
 
-pub async fn mine(pg: &PgPool, user_id: Uuid) -> Result<Vec<Ticket>, AppError> {
-    Ok(sqlx::query_as::<_, Ticket>(&format!(
-        "{SELECT} WHERE t.user_id = $1 ORDER BY t.created_at DESC"
+/// One page (10) of the customer's own tickets, newest first.
+pub async fn mine(pg: &PgPool, user_id: Uuid, page: i64) -> Result<(Vec<Ticket>, i64), AppError> {
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM tickets WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_one(pg)
+        .await?;
+    let items = sqlx::query_as::<_, Ticket>(&format!(
+        "{SELECT} WHERE t.user_id = $1 ORDER BY t.created_at DESC
+         LIMIT 10 OFFSET $2"
     ))
     .bind(user_id)
+    .bind((page - 1).max(0) * 10)
     .fetch_all(pg)
-    .await?)
+    .await?;
+    Ok((items, total))
 }
 
 /// Admin queue, 10 per page: open tickets oldest-first so nobody waits.

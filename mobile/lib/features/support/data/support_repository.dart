@@ -67,9 +67,13 @@ final supportThreadProvider = FutureProvider.autoDispose
   return ref.watch(supportRepositoryProvider).thread(userId);
 });
 
+/// One page of the admin inbox.
+typedef InboxPage = ({List<SupportThread> items, int total, int page});
+
+/// Admin inbox keyed by page — server paginates 10/page.
 final supportInboxProvider =
-    FutureProvider.autoDispose<List<SupportThread>>((ref) {
-  return ref.watch(supportRepositoryProvider).inbox();
+    FutureProvider.autoDispose.family<InboxPage, int>((ref, page) {
+  return ref.watch(supportRepositoryProvider).inbox(page);
 });
 
 class SupportRepository {
@@ -94,11 +98,16 @@ class SupportRepository {
     return _dio.post(path, data: {'body': body});
   }
 
-  Future<List<SupportThread>> inbox() async {
-    final res = await _dio
-        .get<Map<String, dynamic>>('/api/v1/admin/support/threads');
-    return (unwrapEnvelope(res) as List<dynamic>)
-        .map((t) => SupportThread.fromJson(t as Map<String, dynamic>))
-        .toList();
+  Future<InboxPage> inbox(int page) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/admin/support/threads?page=$page');
+    final data = unwrapEnvelope(res) as Map<String, dynamic>;
+    return (
+      items: (data['items'] as List<dynamic>)
+          .map((t) => SupportThread.fromJson(t as Map<String, dynamic>))
+          .toList(),
+      total: data['total'] as int,
+      page: data['page'] as int,
+    );
   }
 }

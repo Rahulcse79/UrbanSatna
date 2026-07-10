@@ -63,8 +63,10 @@ final ticketsRepositoryProvider = Provider<TicketsRepository>((ref) {
 /// One page of the admin queue.
 typedef TicketsPage = ({List<Ticket> items, int total, int page});
 
-final myTicketsProvider = FutureProvider.autoDispose<List<Ticket>>((ref) {
-  return ref.watch(ticketsRepositoryProvider).mine();
+/// My tickets keyed by page — server paginates 10/page.
+final myTicketsProvider =
+    FutureProvider.autoDispose.family<TicketsPage, int>((ref, page) {
+  return ref.watch(ticketsRepositoryProvider).mine(page);
 });
 
 /// Admin queue keyed by (status, page) — server paginates 10/page.
@@ -79,10 +81,16 @@ class TicketsRepository {
 
   final Dio _dio;
 
-  List<Ticket> _list(Response<Map<String, dynamic>> res) =>
-      (unwrapEnvelope(res) as List<dynamic>)
+  TicketsPage _page(Response<Map<String, dynamic>> res) {
+    final data = unwrapEnvelope(res) as Map<String, dynamic>;
+    return (
+      items: (data['items'] as List<dynamic>)
           .map((t) => Ticket.fromJson(t as Map<String, dynamic>))
-          .toList();
+          .toList(),
+      total: data['total'] as int,
+      page: data['page'] as int,
+    );
+  }
 
   Future<Ticket> create({
     required String subject,
@@ -97,21 +105,12 @@ class TicketsRepository {
     return Ticket.fromJson(unwrapEnvelope(res) as Map<String, dynamic>);
   }
 
-  Future<List<Ticket>> mine() async =>
-      _list(await _dio.get<Map<String, dynamic>>('/api/v1/tickets/mine'));
+  Future<TicketsPage> mine(int page) async => _page(await _dio
+      .get<Map<String, dynamic>>('/api/v1/tickets/mine?page=$page'));
 
-  Future<TicketsPage> adminQueue(String status, int page) async {
-    final res = await _dio.get<Map<String, dynamic>>(
-        '/api/v1/admin/tickets?status=$status&page=$page');
-    final data = unwrapEnvelope(res) as Map<String, dynamic>;
-    return (
-      items: (data['items'] as List<dynamic>)
-          .map((t) => Ticket.fromJson(t as Map<String, dynamic>))
-          .toList(),
-      total: data['total'] as int,
-      page: data['page'] as int,
-    );
-  }
+  Future<TicketsPage> adminQueue(String status, int page) async =>
+      _page(await _dio.get<Map<String, dynamic>>(
+          '/api/v1/admin/tickets?status=$status&page=$page'));
 
   Future<void> resolve(String id, String resolution) =>
       _dio.post('/api/v1/admin/tickets/$id/resolve',

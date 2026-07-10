@@ -72,12 +72,20 @@ pub struct SupportThread {
     pub last_at: DateTime<Utc>,
     /// True when the last word was the customer's — needs a reply.
     pub awaiting_reply: bool,
+    /// Same value on every row of a page — drives prev/next.
+    #[serde(skip_serializing)]
+    pub total: i64,
 }
 
-/// Inbox: every conversation, most recently active first.
-pub async fn threads(pg: &PgPool) -> Result<Vec<SupportThread>, AppError> {
+/// Inbox, one page (most recently active first). Server-side pagination
+/// keeps the payload to `per_page` conversations.
+pub async fn threads(
+    pg: &PgPool,
+    page: i64,
+    per_page: i64,
+) -> Result<Vec<SupportThread>, AppError> {
     Ok(sqlx::query_as::<_, SupportThread>(
-        "SELECT * FROM (
+        "SELECT t.*, count(*) OVER() AS total FROM (
             SELECT DISTINCT ON (m.user_id)
                    m.user_id, u.phone, u.full_name,
                    m.body AS last_body, m.created_at AS last_at,
@@ -85,8 +93,11 @@ pub async fn threads(pg: &PgPool) -> Result<Vec<SupportThread>, AppError> {
             FROM support_messages m
             JOIN users u ON u.id = m.user_id
             ORDER BY m.user_id, m.created_at DESC
-         ) t ORDER BY t.last_at DESC LIMIT 50",
+         ) t ORDER BY t.last_at DESC
+         LIMIT $1 OFFSET $2",
     )
+    .bind(per_page)
+    .bind((page - 1).max(0) * per_page)
     .fetch_all(pg)
     .await?)
 }

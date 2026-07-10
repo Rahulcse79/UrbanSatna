@@ -48,12 +48,28 @@ pub async fn check(
     })))
 }
 
+#[derive(Deserialize)]
+pub struct ListQuery {
+    #[serde(default)]
+    pub page: Option<i64>,
+}
+
+/// Admin coupon list, paginated 10/page.
 pub async fn list(
     State(state): State<AppState>,
     current: CurrentUser,
-) -> Result<Json<ApiResponse<Vec<coupons::Coupon>>>, AppError> {
+    Query(q): Query<ListQuery>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     current.require_perm("catalog:manage")?;
-    Ok(Json(ApiResponse::ok(coupons::list(&state.pg).await?)))
+    let page = q.page.unwrap_or(1).max(1);
+    let items = coupons::list_page(&state.pg, page, 10).await?;
+    let total = items.first().map(|c| c.total).unwrap_or(0);
+    Ok(Json(ApiResponse::ok(json!({
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": 10,
+    }))))
 }
 
 /// Offers the signed-in user can still use (active, never redeemed by

@@ -265,5 +265,6 @@
     }
   },
   "priorityUrgent": "Urgent",
-  "priorityWaiting": "Waiting"
+  "priorityWaiting": "Waiting",
+  "cancel": "Cancel"
 }
