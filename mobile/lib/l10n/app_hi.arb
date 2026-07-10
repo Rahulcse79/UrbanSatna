@@ -256,5 +256,7 @@
   "notUploadedLabel": "अपलोड नहीं हुआ",
   "activeLabel": "सक्रिय",
   "inactiveLabel": "निष्क्रिय",
-  "servicesCountLabel": "{count, plural, =0{कोई सेवा नहीं} =1{1 सेवा} other{{count} सेवाएँ}}"
+  "servicesCountLabel": "{count, plural, =0{कोई सेवा नहीं} =1{1 सेवा} other{{count} सेवाएँ}}",
+  "priorityUrgent": "अत्यावश्यक",
+  "priorityWaiting": "प्रतीक्षारत"
 }

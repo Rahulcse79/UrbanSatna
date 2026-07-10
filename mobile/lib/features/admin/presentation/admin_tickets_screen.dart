@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/page_bar.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../support/data/tickets_repository.dart';
 import '../../support/presentation/my_tickets_screen.dart' show TicketCard;
@@ -17,6 +18,7 @@ class AdminTicketsScreen extends ConsumerStatefulWidget {
 
 class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
   String _status = 'open';
+  int _page = 1;
 
   Future<void> _resolve(Ticket ticket) async {
     final l10n = AppLocalizations.of(context);
@@ -59,7 +61,7 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final tickets = ref.watch(adminTicketsProvider(_status));
+    final tickets = ref.watch(adminTicketsProvider((_status, _page)));
     return Scaffold(
       appBar: AppBar(title: Text(l10n.ticketsAdmin)),
       body: Column(
@@ -73,8 +75,11 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
                     value: 'resolved', label: Text(l10n.resolvedLabel)),
               ],
               selected: {_status},
-              onSelectionChanged: (selection) =>
-                  setState(() => _status = selection.first),
+              // Switching queue starts from the first page.
+              onSelectionChanged: (selection) => setState(() {
+                _status = selection.first;
+                _page = 1;
+              }),
             ),
           ),
           Expanded(
@@ -82,22 +87,25 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
               loading: () =>
                   const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text(apiErrorMessage(e))),
-              data: (items) => RefreshIndicator(
-                onRefresh: () async =>
-                    ref.invalidate(adminTicketsProvider(_status)),
-                child: items.isEmpty
+              data: (page) => RefreshIndicator(
+                onRefresh: () async => ref.invalidate(adminTicketsProvider),
+                child: page.items.isEmpty
                     ? ListView(children: [
                         const SizedBox(height: 100),
+                        Icon(Icons.inbox_outlined,
+                            size: 56,
+                            color: Theme.of(context).colorScheme.outline),
+                        const SizedBox(height: 12),
                         Center(child: Text(l10n.noTickets)),
                       ])
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        itemCount: items.length,
+                        itemCount: page.items.length,
                         separatorBuilder: (_, __) =>
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                         itemBuilder: (context, i) => TicketCard(
-                          ticket: items[i],
-                          trailing: items[i].closed
+                          ticket: page.items[i],
+                          trailing: page.items[i].closed
                               ? null
                               : Wrap(
                                   spacing: 8,
@@ -110,7 +118,7 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
                                           await ref
                                               .read(
                                                   ticketsRepositoryProvider)
-                                              .close(items[i].id);
+                                              .close(page.items[i].id);
                                           ref.invalidate(
                                               adminTicketsProvider);
                                         } catch (e) {
@@ -121,10 +129,10 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
                                       },
                                       child: Text(l10n.closeTicket),
                                     ),
-                                    if (items[i].open)
+                                    if (page.items[i].open)
                                       FilledButton(
                                         onPressed: () =>
-                                            _resolve(items[i]),
+                                            _resolve(page.items[i]),
                                         child: Text(l10n.resolveTicket),
                                       ),
                                   ],
@@ -132,6 +140,17 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
                         ),
                       ),
               ),
+            ),
+          ),
+          SafeArea(
+            child: tickets.maybeWhen(
+              data: (page) => PageBar(
+                page: _page,
+                total: page.total,
+                onPrev: () => setState(() => _page--),
+                onNext: () => setState(() => _page++),
+              ),
+              orElse: () => const SizedBox.shrink(),
             ),
           ),
         ],

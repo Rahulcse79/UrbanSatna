@@ -41,19 +41,37 @@ class Ticket {
   bool get open => status == 'open';
   bool get resolved => status == 'resolved';
   bool get closed => status == 'closed';
+
+  /// SLA-style priority for the support queue, derived honestly from how
+  /// long an open ticket has been waiting (there's no priority field yet).
+  /// Only open tickets carry a priority.
+  TicketPriority get priority {
+    if (!open) return TicketPriority.none;
+    final waited = DateTime.now().difference(createdAt);
+    if (waited >= const Duration(hours: 48)) return TicketPriority.urgent;
+    if (waited >= const Duration(hours: 24)) return TicketPriority.waiting;
+    return TicketPriority.none;
+  }
 }
+
+enum TicketPriority { none, waiting, urgent }
 
 final ticketsRepositoryProvider = Provider<TicketsRepository>((ref) {
   return TicketsRepository(ref.watch(dioProvider));
 });
 
+/// One page of the admin queue.
+typedef TicketsPage = ({List<Ticket> items, int total, int page});
+
 final myTicketsProvider = FutureProvider.autoDispose<List<Ticket>>((ref) {
   return ref.watch(ticketsRepositoryProvider).mine();
 });
 
-final adminTicketsProvider =
-    FutureProvider.autoDispose.family<List<Ticket>, String>((ref, status) {
-  return ref.watch(ticketsRepositoryProvider).adminQueue(status);
+/// Admin queue keyed by (status, page) — server paginates 10/page.
+final adminTicketsProvider = FutureProvider.autoDispose
+    .family<TicketsPage, (String, int)>((ref, key) {
+  final (status, page) = key;
+  return ref.watch(ticketsRepositoryProvider).adminQueue(status, page);
 });
 
 class TicketsRepository {
@@ -82,8 +100,18 @@ class TicketsRepository {
   Future<List<Ticket>> mine() async =>
       _list(await _dio.get<Map<String, dynamic>>('/api/v1/tickets/mine'));
 
-  Future<List<Ticket>> adminQueue(String status) async => _list(await _dio
-      .get<Map<String, dynamic>>('/api/v1/admin/tickets?status=$status'));
+  Future<TicketsPage> adminQueue(String status, int page) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/admin/tickets?status=$status&page=$page');
+    final data = unwrapEnvelope(res) as Map<String, dynamic>;
+    return (
+      items: (data['items'] as List<dynamic>)
+          .map((t) => Ticket.fromJson(t as Map<String, dynamic>))
+          .toList(),
+      total: data['total'] as int,
+      page: data['page'] as int,
+    );
+  }
 
   Future<void> resolve(String id, String resolution) =>
       _dio.post('/api/v1/admin/tickets/$id/resolve',

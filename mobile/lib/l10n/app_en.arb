@@ -263,5 +263,7 @@
         "type": "int"
       }
     }
-  }
+  },
+  "priorityUrgent": "Urgent",
+  "priorityWaiting": "Waiting"
 }
