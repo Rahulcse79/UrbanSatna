@@ -14,21 +14,33 @@ pub struct AuditRow {
     pub entity_type: String,
     pub entity_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
+    /// Same value on every row of a page — the window count drives prev/next.
+    #[serde(skip_serializing)]
+    pub total: i64,
 }
 
-/// Latest 100 entries for the admin logs screen, filterable by text.
-pub async fn list(pg: &PgPool, q: &str) -> Result<Vec<AuditRow>, AppError> {
+/// One page of audit entries (newest first), filterable by text. Server-side
+/// pagination keeps the payload to `per_page` rows however large the trail.
+pub async fn list(
+    pg: &PgPool,
+    page: i64,
+    per_page: i64,
+    q: &str,
+) -> Result<Vec<AuditRow>, AppError> {
     Ok(sqlx::query_as::<_, AuditRow>(
         "SELECT a.id, u.phone AS actor_phone, a.actor_type, a.action,
-                a.entity_type, a.entity_id, a.created_at
+                a.entity_type, a.entity_id, a.created_at,
+                count(*) OVER() AS total
          FROM audit_logs a
          LEFT JOIN users u ON u.id = a.actor_id
-         WHERE ($1 = '' OR a.action ILIKE '%' || $1 || '%'
-                        OR a.entity_type ILIKE '%' || $1 || '%'
-                        OR u.phone ILIKE '%' || $1 || '%')
+         WHERE ($3 = '' OR a.action ILIKE '%' || $3 || '%'
+                        OR a.entity_type ILIKE '%' || $3 || '%'
+                        OR u.phone ILIKE '%' || $3 || '%')
          ORDER BY a.created_at DESC
-         LIMIT 100",
+         LIMIT $1 OFFSET $2",
     )
+    .bind(per_page)
+    .bind((page - 1).max(0) * per_page)
     .bind(q)
     .fetch_all(pg)
     .await?)

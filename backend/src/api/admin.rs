@@ -181,19 +181,29 @@ pub async fn unlock_login(
 #[derive(Deserialize)]
 pub struct LogsQuery {
     #[serde(default)]
+    pub page: Option<i64>,
+    #[serde(default)]
     pub q: Option<String>,
 }
 
-/// Latest 100 audit entries, text-filterable (perm audit:read).
+/// Paginated audit trail: 10 per page, newest first, text-filterable
+/// (perm audit:read). prev/next are driven by `total`.
 pub async fn audit_logs(
     State(state): State<AppState>,
     current: CurrentUser,
     Query(query): Query<LogsQuery>,
-) -> Result<Json<ApiResponse<Vec<audit::AuditRow>>>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     current.require_perm("audit:read")?;
-    Ok(Json(ApiResponse::ok(
-        audit::list(&state.pg, query.q.unwrap_or_default().trim()).await?,
-    )))
+    let page = query.page.unwrap_or(1).max(1);
+    let q = query.q.unwrap_or_default();
+    let items = audit::list(&state.pg, page, 10, q.trim()).await?;
+    let total = items.first().map(|r| r.total).unwrap_or(0);
+    Ok(Json(ApiResponse::ok(json!({
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": 10,
+    }))))
 }
 
 /// KYC photo for the review screen (workers:verify only).

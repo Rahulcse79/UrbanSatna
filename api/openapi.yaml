@@ -377,6 +377,12 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: "User directory, 10/page (?page=&q= matches phone/name; perm users:manage:any). Item: {id, phone, full_name?, email?, city?, address?, state?, pincode?, is_blocked, block_reason?, has_avatar, roles[], application_id?, application_status?, has_kyc_doc, has_kyc_selfie, created_at}"
       responses: { "200": { description: "{items, total, page, per_page}" } }
+  /api/v1/admin/audit:
+    get:
+      tags: [admin]
+      security: [{ bearerAuth: [] }]
+      summary: "Audit trail, 10/page newest first (?page=&q= matches action/entity/phone; perm audit:read). Item: {id, actor_phone?, actor_type, action, entity_type, entity_id?, created_at}"
+      responses: { "200": { description: "{items, total, page, per_page}" } }
   /api/v1/admin/users/{id}/avatar:
     get:
       tags: [admin]
