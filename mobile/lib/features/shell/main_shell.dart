@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/auth/auth_controller.dart';
 import '../../core/widgets/bot_avatar.dart';
@@ -23,6 +24,10 @@ class MainShell extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final isWorker =
         ref.watch(authControllerProvider.select((t) => t?.isWorker ?? false));
+    // Admins answer support from the inbox — chatting with themselves via
+    // the bubble is pointless, so they don't get one.
+    final isAdmin =
+        ref.watch(authControllerProvider.select((t) => t?.isAdmin ?? false));
     final incomplete = ref.watch(meProvider).maybeWhen(
         data: (me) =>
             (me['full_name'] as String?)?.trim().isEmpty != false ||
@@ -40,17 +45,19 @@ class MainShell extends ConsumerWidget {
         ref.watch(currentTabProvider).clamp(0, pages.length - 1);
 
     return Scaffold(
-      body: Stack(
-        children: [
-          IndexedStack(index: tab, children: pages),
-          // Support chat launcher: the bot mascot, bottom-left on every tab.
-          Positioned(
-            left: 16,
-            bottom: 16,
-            child: SafeArea(child: _SupportChatButton(label: l10n.liveChat)),
-          ),
-        ],
-      ),
+      body: LayoutBuilder(builder: (context, constraints) {
+        return Stack(
+          children: [
+            IndexedStack(index: tab, children: pages),
+            // Chatbot launcher: draggable bubble, customers/workers only.
+            if (!isAdmin)
+              _DraggableChatBubble(
+                bounds: constraints.biggest,
+                label: l10n.liveChat,
+              ),
+          ],
+        );
+      }),
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab,
         onDestinationSelected: (i) =>
@@ -78,6 +85,75 @@ class MainShell extends ConsumerWidget {
             label: l10n.navProfile,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The chatbot bubble: starts bottom-right, drag it anywhere; the spot is
+/// remembered across app launches and clamped back on-screen when the
+/// screen size changes.
+class _DraggableChatBubble extends StatefulWidget {
+  const _DraggableChatBubble({required this.bounds, required this.label});
+
+  final Size bounds;
+  final String label;
+
+  @override
+  State<_DraggableChatBubble> createState() => _DraggableChatBubbleState();
+}
+
+class _DraggableChatBubbleState extends State<_DraggableChatBubble> {
+  static const _size = 58.0; // BotAvatar 52 + bubble padding
+  static const _margin = 8.0;
+  static const _dxKey = 'chat_bubble_dx';
+  static const _dyKey = 'chat_bubble_dy';
+
+  Offset? _pos; // null until restored or first dragged → default spot
+
+  @override
+  void initState() {
+    super.initState();
+    _restore();
+  }
+
+  Future<void> _restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dx = prefs.getDouble(_dxKey);
+    final dy = prefs.getDouble(_dyKey);
+    if (mounted && dx != null && dy != null) {
+      setState(() => _pos = Offset(dx, dy));
+    }
+  }
+
+  Future<void> _save(Offset pos) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_dxKey, pos.dx);
+    await prefs.setDouble(_dyKey, pos.dy);
+  }
+
+  Offset _clamp(Offset raw) {
+    final topInset = MediaQuery.of(context).padding.top;
+    return Offset(
+      raw.dx.clamp(_margin, widget.bounds.width - _size - _margin),
+      raw.dy.clamp(topInset + _margin, widget.bounds.height - _size - _margin),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pos = _clamp(_pos ??
+        Offset(
+          widget.bounds.width - _size - 16,
+          widget.bounds.height - _size - 16,
+        ));
+    return Positioned(
+      left: pos.dx,
+      top: pos.dy,
+      child: GestureDetector(
+        onPanUpdate: (d) => setState(() => _pos = _clamp(pos + d.delta)),
+        onPanEnd: (_) => _save(_pos ?? pos),
+        child: _SupportChatButton(label: widget.label),
       ),
     );
   }

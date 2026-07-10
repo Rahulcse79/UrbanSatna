@@ -110,29 +110,10 @@ class ProfileScreen extends ConsumerWidget {
                     data: (c) => c, orElse: () => null);
                 final phone = config?.supportPhone;
                 final email = config?.supportEmail;
-                final online = config?.supportOnline ?? false;
+                // Live chat lives behind the floating chatbot bubble only;
+                // a second entry point here just duplicated it.
                 return Column(
                   children: [
-                    ListTile(
-                      leading: const Icon(Icons.forum_outlined),
-                      title: Row(
-                        children: [
-                          Text(l10n.liveChat),
-                          const SizedBox(width: 8),
-                          Container(
-                            width: 9,
-                            height: 9,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: online ? Colors.green : Colors.red,
-                            ),
-                          ),
-                        ],
-                      ),
-                      subtitle: Text(
-                          online ? l10n.onlineLabel : l10n.offlineLabel),
-                      onTap: () => context.push('/support-chat'),
-                    ),
                     if (phone != null && phone.isNotEmpty)
                       ListTile(
                         leading: const Icon(Icons.support_agent),

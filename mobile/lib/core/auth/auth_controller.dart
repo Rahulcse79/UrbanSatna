@@ -18,6 +18,8 @@ class AuthTokens {
   final List<String> roles;
 
   bool get isWorker => roles.contains('worker');
+  bool get isAdmin =>
+      roles.contains('admin') || roles.contains('super_admin');
 }
 
 const _storage = FlutterSecureStorage();
