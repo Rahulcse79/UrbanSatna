@@ -1,7 +1,9 @@
 # Image assets
 
 - `chat_bot.png` — the robot mascot used by the support-chat launcher
-  (bottom-left of the app) and as the chatbot's avatar in the live chat.
-  Save the mascot image here with exactly this filename (square, ideally
-  512×512 with transparent background). Until the file exists the app
-  falls back to a themed robot icon — nothing breaks.
+  (draggable bubble) and as the chatbot's avatar in the live chat.
+  512×512, transparent background, sized so the whole mascot fits the
+  inscribed circle of the square (round avatars clip to a circle).
+  Source render: `ai-robot.png` (1280×1280); regenerate by trimming the
+  alpha bbox (threshold >24 to ignore the soft shadow) and padding to
+  the mascot's bounding circle + 3%.
