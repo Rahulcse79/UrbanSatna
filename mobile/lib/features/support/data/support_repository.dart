@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +12,7 @@ class SupportMessage {
     required this.fromSupport,
     required this.fromBot,
     required this.createdAt,
+    this.attachmentMime,
   });
 
   factory SupportMessage.fromJson(Map<String, dynamic> json) =>
@@ -19,6 +22,7 @@ class SupportMessage {
         fromSupport: json['from_support'] as bool? ?? false,
         fromBot: json['from_bot'] as bool? ?? false,
         createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+        attachmentMime: json['attachment_mime'] as String?,
       );
 
   final String id;
@@ -28,6 +32,14 @@ class SupportMessage {
   /// Chatbot replies render with the bot identity (avatar + name).
   final bool fromBot;
   final DateTime createdAt;
+
+  /// When set the message carries an image/video; fetch bytes from
+  /// SupportRepository.attachment.
+  final String? attachmentMime;
+
+  bool get isImage => attachmentMime?.startsWith('image/') ?? false;
+  bool get isVideo => attachmentMime?.startsWith('video/') ?? false;
+  bool get hasAttachment => attachmentMime != null;
 }
 
 class SupportThread {
@@ -76,6 +88,14 @@ final supportInboxProvider =
   return ref.watch(supportRepositoryProvider).inbox(page);
 });
 
+/// Attachment bytes cached per (userId, messageId). Messages are
+/// immutable so the fetch is one-shot; the chat list polls, this doesn't.
+final supportAttachmentProvider =
+    FutureProvider.family<Uint8List?, (String?, String)>((ref, key) {
+  final (userId, messageId) = key;
+  return ref.read(supportRepositoryProvider).attachment(userId, messageId);
+});
+
 class SupportRepository {
   const SupportRepository(this._dio);
 
@@ -96,6 +116,47 @@ class SupportRepository {
         ? '/api/v1/support/messages'
         : '/api/v1/admin/support/$userId/messages';
     return _dio.post(path, data: {'body': body});
+  }
+
+  /// Upload an image/video attachment. Passing `onProgress` shows a
+  /// progress bar in the UI; the backend enforces the 10 MB limit again.
+  Future<void> sendAttachment(
+    String? userId,
+    Uint8List bytes,
+    String mime, {
+    void Function(int sent, int total)? onProgress,
+  }) {
+    final path = userId == null
+        ? '/api/v1/support/messages/attachment'
+        : '/api/v1/admin/support/$userId/messages/attachment';
+    return _dio.post(
+      path,
+      data: Stream.fromIterable([bytes]),
+      options: Options(
+        contentType: mime,
+        headers: {Headers.contentLengthHeader: bytes.length},
+        sendTimeout: const Duration(minutes: 2),
+      ),
+      onSendProgress: onProgress,
+    );
+  }
+
+  /// Fetch bytes for one attachment on the given thread (null = my
+  /// thread, matches the send/thread endpoints).
+  Future<Uint8List?> attachment(String? userId, String messageId) async {
+    final path = userId == null
+        ? '/api/v1/support/messages/$messageId/attachment'
+        : '/api/v1/admin/support/$userId/messages/$messageId/attachment';
+    try {
+      final res = await _dio.get<List<int>>(
+        path,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final data = res.data;
+      return data == null ? null : Uint8List.fromList(data);
+    } on DioException {
+      return null;
+    }
   }
 
   Future<InboxPage> inbox(int page) async {

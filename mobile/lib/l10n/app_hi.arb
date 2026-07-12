@@ -267,5 +267,9 @@
   "appSettingsTitle": "ऐप सेटिंग्स",
   "notSetLabel": "सेट नहीं",
   "unsetLabel": "हटाएँ",
-  "serverUrlAdminHint": "सभी ऐप इसी URL का उपयोग करेंगे। खाली छोड़ने पर ऐप अपना डिफ़ॉल्ट उपयोग करेंगे।"
+  "serverUrlAdminHint": "सभी ऐप इसी URL का उपयोग करेंगे। खाली छोड़ने पर ऐप अपना डिफ़ॉल्ट उपयोग करेंगे।",
+  "mediaSizeError": "फ़ाइल PNG/JPG/MP4 और 10 MB से कम होनी चाहिए",
+  "mediaTypeError": "केवल PNG, JPG या MP4 अटैचमेंट की अनुमति है",
+  "previewAttachment": "अटैचमेंट प्रीव्यू",
+  "uploadingLabel": "अपलोड हो रहा है"
 }

@@ -203,8 +203,10 @@ paths:
     get:
       tags: [bookings]
       security: [{ bearerAuth: [] }]
-      summary: My bookings; ?scope=active(default)|past
-      responses: { "200": { description: "[Booking]" } }
+      summary: >-
+        My bookings; ?scope=active(default)|past&page=1. Paginated 10/page;
+        meta carries {page, per_page, total}.
+      responses: { "200": { description: "[Booking] + meta pagination" } }
   /api/v1/bookings/{id}/cancel:
     post:
       tags: [bookings]
@@ -270,13 +272,26 @@ paths:
     get:
       tags: [support]
       security: [{ bearerAuth: [] }]
-      summary: "My live-support thread. SupportMessage: {id, user_id, sender_id, sender_name?, from_support, from_bot, body, created_at}; from_bot marks chatbot replies"
+      summary: "My live-support thread. SupportMessage: {id, user_id, sender_id, sender_name?, from_support, from_bot, body, attachment_mime?, created_at}; from_bot marks chatbot replies; when attachment_mime is set fetch bytes at .../{mid}/attachment"
       responses: { "200": { description: "[SupportMessage]" } }
     post:
       tags: [support]
       security: [{ bearerAuth: [] }]
       summary: "Send message {body} (1-2000 chars). While support_online=false the chatbot (AI when ANTHROPIC_API_KEY set, keyword bot otherwise) replies into the thread"
       responses: { "200": { description: SupportMessage } }
+  /api/v1/support/messages/attachment:
+    post:
+      tags: [support]
+      security: [{ bearerAuth: [] }]
+      summary: "Upload attachment to my thread — raw body, PNG/JPG image or MP4 video, ≤ 10 MB, magic-byte checked"
+      responses: { "200": { description: SupportMessage }, "422": { description: VALIDATION_ERROR } }
+  /api/v1/support/messages/{mid}/attachment:
+    get:
+      tags: [support]
+      security: [{ bearerAuth: [] }]
+      summary: Attachment bytes for one of my messages
+      parameters: [{ name: mid, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: image/png|image/jpeg|video/mp4 }, "404": { description: none } }
   /api/v1/admin/support/threads:
     get:
       tags: [support]
@@ -294,6 +309,21 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: "Staff reply {body} into the customer's thread (perm bookings:manage:any)"
       responses: { "200": { description: SupportMessage } }
+  /api/v1/admin/support/{user_id}/messages/attachment:
+    post:
+      tags: [support]
+      security: [{ bearerAuth: [] }]
+      summary: "Staff attaches to a customer's thread — raw body, PNG/JPG or MP4, ≤ 10 MB (perm bookings:manage:any)"
+      responses: { "200": { description: SupportMessage }, "422": { description: VALIDATION_ERROR } }
+  /api/v1/admin/support/{user_id}/messages/{mid}/attachment:
+    get:
+      tags: [support]
+      security: [{ bearerAuth: [] }]
+      summary: Attachment bytes on a customer's thread (perm bookings:manage:any)
+      parameters:
+        - { name: user_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: mid, in: path, required: true, schema: { type: string, format: uuid } }
+      responses: { "200": { description: image/png|image/jpeg|video/mp4 }, "404": { description: none } }
   /api/v1/tickets:
     post:
       tags: [bookings]

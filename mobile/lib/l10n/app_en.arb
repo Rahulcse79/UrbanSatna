@@ -274,5 +274,9 @@
   "appSettingsTitle": "App settings",
   "notSetLabel": "Not set",
   "unsetLabel": "Unset",
-  "serverUrlAdminHint": "All apps follow this URL. Leave empty to let apps use their built-in default."
+  "serverUrlAdminHint": "All apps follow this URL. Leave empty to let apps use their built-in default.",
+  "mediaSizeError": "File must be PNG/JPG/MP4 under 10 MB",
+  "mediaTypeError": "Only PNG, JPG or MP4 attachments allowed",
+  "previewAttachment": "Preview attachment",
+  "uploadingLabel": "Uploading"
 }

@@ -106,15 +106,33 @@ pub fn router(state: AppState) -> Router {
         .route("/admin/tickets", get(tickets::list))
         .route("/admin/tickets/{id}/resolve", post(tickets::resolve))
         .route("/admin/tickets/{id}/close", post(tickets::close))
-        // live support chat (user thread + admin inbox)
+        // live support chat (user thread + admin inbox; image/video uploads)
         .route(
             "/support/messages",
             get(support::my_thread).post(support::send),
+        )
+        .route(
+            "/support/messages/attachment",
+            post(support::send_attachment)
+                .layer(DefaultBodyLimit::max(support::MAX_ATTACHMENT_BYTES + 1024)),
+        )
+        .route(
+            "/support/messages/{mid}/attachment",
+            get(support::attachment),
         )
         .route("/admin/support/threads", get(support::threads))
         .route(
             "/admin/support/{user_id}/messages",
             get(support::admin_thread).post(support::admin_send),
+        )
+        .route(
+            "/admin/support/{user_id}/messages/attachment",
+            post(support::admin_send_attachment)
+                .layer(DefaultBodyLimit::max(support::MAX_ATTACHMENT_BYTES + 1024)),
+        )
+        .route(
+            "/admin/support/{user_id}/messages/{mid}/attachment",
+            get(support::admin_attachment),
         )
         // admin: dashboard, user management, activity logs
         .route("/admin/stats", get(admin::stats))
