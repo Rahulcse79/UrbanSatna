@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
@@ -423,29 +425,65 @@ class _MessageBubble extends ConsumerWidget {
               height: 140,
               child: Center(child: CircularProgressIndicator()),
             )
-          : ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.memory(
-                bytes,
-                width: 220,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
+          : GestureDetector(
+              // Tap opens the picture full-screen with pinch-to-zoom.
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  fullscreenDialog: true,
+                  builder: (_) => _ImageViewerPage(bytes: bytes),
+                ),
+              ),
+              child: Hero(
+                tag: 'support-attachment-${message.id}',
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.memory(
+                    bytes,
+                    width: 220,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                  ),
+                ),
               ),
             );
     } else if (message.isVideo) {
-      attachment = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: onBubble.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(10),
+      attachment = InkWell(
+        onTap: () => showDialog<void>(
+          context: context,
+          barrierColor: Colors.black.withValues(alpha: 0.85),
+          builder: (_) => _VideoPlayerDialog(
+            userId: userId,
+            messageId: message.id,
+            mime: message.attachmentMime ?? 'video/mp4',
+          ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.videocam, size: 18, color: onBubble),
-            const SizedBox(width: 6),
-            Text(l10n.videoLabel, style: TextStyle(color: onBubble)),
-          ],
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: onBubble.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // A visible play button reads as "tap to play" — the plain
+              // videocam icon in the old design didn't.
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: onBubble.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.play_arrow, size: 20, color: onBubble),
+              ),
+              const SizedBox(width: 8),
+              Text(l10n.videoLabel,
+                  style: TextStyle(
+                      color: onBubble, fontWeight: FontWeight.w600)),
+            ],
+          ),
         ),
       );
     }
@@ -580,6 +618,205 @@ class _AttachmentPreviewDialog extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Full-screen image viewer with pinch-to-zoom. Bytes come from the same
+/// supportAttachmentProvider the bubble already loaded, so opening it is
+/// instant — no second network fetch.
+class _ImageViewerPage extends StatelessWidget {
+  const _ImageViewerPage({required this.bytes});
+
+  final Uint8List bytes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          maxScale: 6,
+          child: Image.memory(bytes, fit: BoxFit.contain),
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-screen video player dialog. Videos aren't eager-fetched in the
+/// thread (they can be up to 10 MB each) — we fetch bytes on tap, write
+/// them to a temp file, and play with a tap-to-toggle play/pause overlay.
+class _VideoPlayerDialog extends ConsumerStatefulWidget {
+  const _VideoPlayerDialog({
+    required this.userId,
+    required this.messageId,
+    required this.mime,
+  });
+
+  final String? userId;
+  final String messageId;
+  final String mime;
+
+  @override
+  ConsumerState<_VideoPlayerDialog> createState() =>
+      _VideoPlayerDialogState();
+}
+
+class _VideoPlayerDialogState extends ConsumerState<_VideoPlayerDialog> {
+  VideoPlayerController? _controller;
+  File? _tempFile;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final bytes = await ref
+          .read(supportRepositoryProvider)
+          .attachment(widget.userId, widget.messageId);
+      if (!mounted || bytes == null) {
+        setState(() => _error = 'empty');
+        return;
+      }
+      // Pick a plausible extension from the mime so the platform's media
+      // codec detection has an easy time.
+      final ext = widget.mime == 'video/mp4' ? 'mp4' : 'bin';
+      final tmp = File(
+        '${Directory.systemTemp.path}/servexa_${widget.messageId}.$ext',
+      );
+      await tmp.writeAsBytes(bytes, flush: true);
+      final controller = VideoPlayerController.file(tmp);
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        await tmp.delete().catchError((_) => tmp);
+        return;
+      }
+      // Auto-play on open — matches how most chat apps behave.
+      await controller.play();
+      setState(() {
+        _controller = controller;
+        _tempFile = tmp;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = e);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    _tempFile?.delete().catchError((_) => _tempFile!);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final controller = _controller;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(apiErrorMessage(_error!),
+                  style: const TextStyle(color: Colors.white)),
+            )
+          else if (controller == null)
+            const Padding(
+              padding: EdgeInsets.all(48),
+              child: CircularProgressIndicator(),
+            )
+          else
+            AspectRatio(
+              aspectRatio: controller.value.aspectRatio == 0
+                  ? 16 / 9
+                  : controller.value.aspectRatio,
+              child: GestureDetector(
+                onTap: () {
+                  if (controller.value.isPlaying) {
+                    controller.pause();
+                  } else {
+                    controller.play();
+                  }
+                  setState(() {});
+                },
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    VideoPlayer(controller),
+                    // Center play button fades in while paused.
+                    ValueListenableBuilder<VideoPlayerValue>(
+                      valueListenable: controller,
+                      builder: (context, value, _) => AnimatedOpacity(
+                        opacity: value.isPlaying ? 0 : 1,
+                        duration: const Duration(milliseconds: 150),
+                        child: Center(
+                          child: Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.play_arrow,
+                                size: 40, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: VideoProgressIndicator(
+                        controller,
+                        allowScrubbing: true,
+                        colors: VideoProgressColors(
+                          playedColor: Theme.of(context).colorScheme.primary,
+                          bufferedColor:
+                              Colors.white.withValues(alpha: 0.35),
+                          backgroundColor:
+                              Colors.white.withValues(alpha: 0.15),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (controller == null && _error == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(l10n.uploadingLabel,
+                  style: const TextStyle(color: Colors.white70)),
+            ),
+        ],
       ),
     );
   }
