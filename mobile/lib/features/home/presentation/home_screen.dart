@@ -112,7 +112,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 return RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(categoriesProvider);
-                    ref.invalidate(myBookingsProvider('active'));
+                    ref.invalidate(myBookingsProvider);
                     // picks up admin changes (promo banner, flags) live
                     ref.invalidate(appConfigProvider);
                   },
@@ -417,11 +417,11 @@ class _ActiveBookingBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final active = ref.watch(myBookingsProvider('active'));
+    final active = ref.watch(myBookingsProvider((scope: 'active', page: 1)));
     return active.maybeWhen(
-      data: (items) {
-        if (items.isEmpty) return const SizedBox.shrink();
-        final b = items.first;
+      data: (pageData) {
+        if (pageData.items.isEmpty) return const SizedBox.shrink();
+        final b = pageData.items.first;
         return Material(
           color: scheme.inverseSurface,
           borderRadius: BorderRadius.circular(16),

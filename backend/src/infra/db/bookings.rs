@@ -165,18 +165,36 @@ pub async fn create(
 }
 
 /// Customer's bookings. `active` = not yet completed/cancelled.
-pub async fn mine(pg: &PgPool, customer_id: Uuid, active: bool) -> Result<Vec<Booking>, AppError> {
+/// Returns one page plus the total count so clients can render prev/next
+/// without loading everything.
+pub async fn mine(
+    pg: &PgPool,
+    customer_id: Uuid,
+    active: bool,
+    page: i64,
+    per_page: i64,
+) -> Result<(Vec<Booking>, i64), AppError> {
     let filter = if active {
         "b.status NOT IN ('completed','cancelled')"
     } else {
         "b.status IN ('completed','cancelled')"
     };
-    Ok(sqlx::query_as::<_, Booking>(&format!(
-        "{SELECT} WHERE b.customer_id = $1 AND {filter} ORDER BY b.created_at DESC"
+    let total: i64 = sqlx::query_scalar(&format!(
+        "SELECT count(*) FROM bookings b WHERE b.customer_id = $1 AND {filter}"
     ))
     .bind(customer_id)
+    .fetch_one(pg)
+    .await?;
+    let items = sqlx::query_as::<_, Booking>(&format!(
+        "{SELECT} WHERE b.customer_id = $1 AND {filter}
+         ORDER BY b.created_at DESC LIMIT $2 OFFSET $3"
+    ))
+    .bind(customer_id)
+    .bind(per_page)
+    .bind((page - 1) * per_page)
     .fetch_all(pg)
-    .await?)
+    .await?;
+    Ok((items, total))
 }
 
 /// Unassigned pending jobs any worker can pick up (not their own bookings).

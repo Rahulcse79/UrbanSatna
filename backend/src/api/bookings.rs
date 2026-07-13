@@ -94,10 +94,14 @@ pub async fn create(
     Ok(Json(ApiResponse::ok(booking)))
 }
 
+const MINE_PER_PAGE: i64 = 10;
+
 #[derive(Deserialize)]
 pub struct MineQuery {
     #[serde(default)]
     pub scope: Option<String>, // active (default) | past
+    #[serde(default)]
+    pub page: Option<i64>,
 }
 
 pub async fn mine(
@@ -106,8 +110,11 @@ pub async fn mine(
     Query(q): Query<MineQuery>,
 ) -> Result<Json<ApiResponse<Vec<bookings::Booking>>>, AppError> {
     let active = q.scope.as_deref() != Some("past");
-    Ok(Json(ApiResponse::ok(
-        bookings::mine(&state.pg, current.id, active).await?,
+    let page = q.page.unwrap_or(1).max(1);
+    let (items, total) = bookings::mine(&state.pg, current.id, active, page, MINE_PER_PAGE).await?;
+    Ok(Json(ApiResponse::ok_with_meta(
+        items,
+        json!({ "page": page, "per_page": MINE_PER_PAGE, "total": total }),
     )))
 }
 

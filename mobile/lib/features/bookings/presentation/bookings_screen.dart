@@ -83,53 +83,127 @@ class BookingsScreen extends ConsumerWidget {
   }
 }
 
-class _BookingsList extends ConsumerWidget {
+const _perPage = 10;
+
+class _BookingsList extends ConsumerStatefulWidget {
   const _BookingsList({required this.scope});
 
   final String scope;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_BookingsList> createState() => _BookingsListState();
+}
+
+class _BookingsListState extends ConsumerState<_BookingsList>
+    with AutomaticKeepAliveClientMixin {
+  int _page = 1;
+
+  // Keep each tab's page while switching between Active and Past.
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
     final l10n = AppLocalizations.of(context);
-    final bookings = ref.watch(myBookingsProvider(scope));
+    final key = (scope: widget.scope, page: _page);
+    final bookings = ref.watch(myBookingsProvider(key));
     return bookings.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text(apiErrorMessage(e))),
-      data: (items) => RefreshIndicator(
-        onRefresh: () async => ref.invalidate(myBookingsProvider(scope)),
-        child: items.isEmpty
-            ? ListView(
-                children: [
-                  const SizedBox(height: 100),
-                  Center(
-                    child: Container(
-                      width: 96,
-                      height: 96,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.receipt_long_outlined,
-                          size: 44,
-                          color: Theme.of(context).colorScheme.primary),
+      data: (pageData) => Column(
+        children: [
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async => ref.invalidate(myBookingsProvider(key)),
+              child: pageData.items.isEmpty
+                  ? ListView(
+                      children: [
+                        const SizedBox(height: 100),
+                        Center(
+                          child: Container(
+                            width: 96,
+                            height: 96,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.receipt_long_outlined,
+                                size: 44,
+                                color: Theme.of(context).colorScheme.primary),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: Text(l10n.noBookings,
+                              style: Theme.of(context).textTheme.titleMedium),
+                        ),
+                      ],
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: pageData.items.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, i) => _BookingCard(
+                          booking: pageData.items[i], scope: widget.scope),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Center(
-                    child: Text(l10n.noBookings,
-                        style: Theme.of(context).textTheme.titleMedium),
-                  ),
-                ],
-              )
-            : ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, i) =>
-                    _BookingCard(booking: items[i], scope: scope),
+            ),
+          ),
+          if (pageData.total > _perPage || _page > 1)
+            SafeArea(
+              top: false,
+              child: _PaginationBar(
+                page: _page,
+                total: pageData.total,
+                onChanged: (p) => setState(() => _page = p),
               ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Previous / Next pager — each tap fetches exactly one page of 10
+/// from the server (same pattern as the admin screens).
+class _PaginationBar extends StatelessWidget {
+  const _PaginationBar({
+    required this.page,
+    required this.total,
+    required this.onChanged,
+  });
+
+  final int page;
+  final int total;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final lastPage = (total / _perPage).ceil().clamp(1, 9999);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.chevron_left, size: 18),
+            label: Text(l10n.prevLabel),
+            onPressed: page > 1 ? () => onChanged(page - 1) : null,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('$page / $lastPage',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.chevron_right, size: 18),
+            label: Text(l10n.nextLabel),
+            onPressed: page < lastPage ? () => onChanged(page + 1) : null,
+          ),
+        ],
       ),
     );
   }
@@ -219,8 +293,8 @@ class _BookingCard extends ConsumerWidget {
   final String scope;
 
   void _refresh(WidgetRef ref) {
-    ref.invalidate(myBookingsProvider('active'));
-    ref.invalidate(myBookingsProvider('past'));
+    // Invalidate every (scope, page) combination currently cached.
+    ref.invalidate(myBookingsProvider);
   }
 
   @override

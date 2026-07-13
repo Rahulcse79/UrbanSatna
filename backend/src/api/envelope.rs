@@ -27,6 +27,15 @@ impl<T: Serialize> ApiResponse<T> {
         }
     }
 
+    pub fn ok_with_meta(data: T, meta: serde_json::Value) -> Self {
+        Self {
+            success: true,
+            data: Some(data),
+            error: None,
+            meta: Some(meta),
+        }
+    }
+
     pub fn error(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             success: false,

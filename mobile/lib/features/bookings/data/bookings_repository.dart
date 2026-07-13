@@ -8,9 +8,13 @@ final bookingsRepositoryProvider = Provider<BookingsRepository>((ref) {
   return BookingsRepository(ref.watch(dioProvider));
 });
 
-final myBookingsProvider =
-    FutureProvider.autoDispose.family<List<Booking>, String>((ref, scope) {
-  return ref.watch(bookingsRepositoryProvider).mine(scope);
+typedef BookingsPage = ({List<Booking> items, int total});
+
+/// One page (10) of the customer's bookings; a new API call fires only
+/// when the (scope, page) key changes — never the whole history at once.
+final myBookingsProvider = FutureProvider.autoDispose
+    .family<BookingsPage, ({String scope, int page})>((ref, key) {
+  return ref.watch(bookingsRepositoryProvider).mine(key.scope, page: key.page);
 });
 
 final availableJobsProvider = FutureProvider.autoDispose<List<Booking>>((ref) {
@@ -96,10 +100,12 @@ class BookingsRepository {
     return _list(res);
   }
 
-  Future<List<Booking>> mine(String scope) async {
-    final res = await _dio
-        .get<Map<String, dynamic>>('/api/v1/bookings/mine?scope=$scope');
-    return _list(res);
+  Future<BookingsPage> mine(String scope, {int page = 1}) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/bookings/mine?scope=$scope&page=$page');
+    final items = _list(res);
+    final meta = res.data?['meta'] as Map<String, dynamic>?;
+    return (items: items, total: (meta?['total'] as int?) ?? items.length);
   }
 
   Future<List<Booking>> availableJobs() async {
